@@ -10,9 +10,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@hashgraph/hedera-wallet-connect": "^1.5.1",
+    "@hashgraph/sdk": "^2.69.0",
+    "@radix-ui/react-slot": "^1.2.3",
     "@tailwindcss/postcss": "^4.1.11",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "ethers": "^6.15.0",
+    "hashconnect": "^3.0.13",
     "lucide-react": "^0.536.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
