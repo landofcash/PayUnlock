@@ -80,3 +80,5 @@ export const getCurrentConfig = (): NetworkConfig => {
   const network = (localStorage.getItem("hedera_network") as "mainnet" | "testnet") || "testnet";
   return getConfig(network);
 };
+
+export const signPrefix = "payunlock-";

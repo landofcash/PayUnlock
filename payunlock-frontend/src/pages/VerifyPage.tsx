@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Layout } from "../components/Layout";
 
 export function VerifyPage() {
-  const [file, setFile] = useState<File | null>(null);
+  const [_, setFile] = useState<File | null>(null);
   const [providedHash, setProvidedHash] = useState("");
   const [calculatedHash, setCalculatedHash] = useState("");
   const [verificationResult, setVerificationResult] = useState<"success" | "failure" | null>(null);

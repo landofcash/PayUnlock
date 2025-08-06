@@ -15,6 +15,7 @@ import { AdminDashboardPage } from './pages/AdminDashboardPage'
 import { AdminOrdersPage } from './pages/AdminOrdersPage'
 import { FAQPage } from './pages/FAQPage'
 import { TermsPage } from './pages/TermsPage'
+import {WalletSignDebugPage} from "@/pages/Debug/WalletSignDebugPage.tsx";
 
 function App() {
   return (
@@ -47,6 +48,8 @@ function App() {
         {/* Info pages */}
         <Route path="/faq" element={<FAQPage />} />
         <Route path="/terms" element={<TermsPage />} />
+
+        <Route path="/debug/wallet-sign" element={<WalletSignDebugPage />} />
 
         {/* Fallback for unknown routes */}
         <Route path="*" element={<Navigate to="/" replace />} />

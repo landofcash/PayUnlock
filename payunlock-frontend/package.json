@@ -12,21 +12,32 @@
   "dependencies": {
     "@hashgraph/hedera-wallet-connect": "^1.5.1",
     "@hashgraph/sdk": "^2.69.0",
+    "@radix-ui/react-label": "^2.1.7",
     "@radix-ui/react-slot": "^1.2.3",
     "@tailwindcss/postcss": "^4.1.11",
+    "@types/elliptic": "^6.4.18",
+    "@walletconnect/modal": "^2.7.0",
+    "buffer": "^6.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "ethers": "^6.15.0",
-    "hashconnect": "^3.0.13",
+    "crypto-browserify": "^3.12.1",
+    "date-fns": "^4.1.0",
+    "eciesjs": "^0.4.15",
+    "elliptic": "^6.6.1",
     "lucide-react": "^0.536.0",
+    "pako": "^2.1.0",
+    "process": "^0.11.10",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.7.1",
-    "tailwind-merge": "^3.3.1"
+    "stream-browserify": "^3.0.0",
+    "tailwind-merge": "^3.3.1",
+    "util": "^0.12.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",
     "@types/node": "^24.2.0",
+    "@types/pako": "^2.0.3",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
@@ -40,6 +51,7 @@
     "tw-animate-css": "^1.3.6",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.35.1",
-    "vite": "^7.0.4"
+    "vite": "^7.0.4",
+    "vite-plugin-node-polyfills": "^0.24.0"
   }
 }

@@ -1,83 +1,11 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { HashConnect } from "hashconnect";
-import { getCurrentConfig } from "@/config";
 import { Wallet, User, LogOut, AlertCircle, Loader2 } from "lucide-react";
-
-interface WalletState {
-  accountId: string | null;
-  isConnected: boolean;
-  walletName: string | null;
-}
+import { useWallet } from "@/contexts/WalletContext";
 
 export default function WalletConnectButton() {
-  const [hashconnect, setHashconnect] = useState<HashConnect | null>(null);
-  const [walletState, setWalletState] = useState<WalletState>({
-    accountId: null,
-    isConnected: false,
-    walletName: null,
-  });
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { walletState, connector, isConnecting, error, connectWallet, disconnectWallet } = useWallet();
   const [showDropdown, setShowDropdown] = useState(false);
-
-  // Initialize HashConnect
-  useEffect(() => {
-    const initHashConnect = async () => {
-      try {
-        const config = getCurrentConfig();
-        const { ledgerId, hashConnect: hcConfig } = config;
-
-        const hc = new HashConnect(
-          ledgerId,
-          hcConfig.projectId,
-          hcConfig.metadata,
-          hcConfig.debug
-        );
-
-        // Set up event listeners
-        hc.pairingEvent.on((pairingData) => {
-          console.log("Paired with wallet:", pairingData);
-          setWalletState({
-            accountId: pairingData.accountIds[0],
-            isConnected: true,
-            walletName: pairingData.metadata?.name || "Wallet",
-          });
-          setIsConnecting(false);
-          setError(null);
-        });
-
-        hc.disconnectionEvent.on((data) => {
-          console.log("Wallet disconnected:", data);
-          setWalletState({
-            accountId: null,
-            isConnected: false,
-            walletName: null,
-          });
-          setShowDropdown(false);
-        });
-
-        hc.connectionStatusChangeEvent.on((connectionStatus) => {
-          console.log("Connection status changed:", connectionStatus);
-        });
-
-        await hc.init();
-        setHashconnect(hc);
-
-      } catch (err) {
-        console.error("HashConnect initialization error:", err);
-        setError("Failed to initialize wallet connection");
-      }
-    };
-
-    initHashConnect();
-
-    return () => {
-      if (hashconnect) {
-        hashconnect.disconnect();
-      }
-    };
-  }, []);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -93,39 +21,6 @@ export default function WalletConnectButton() {
       return () => document.removeEventListener('click', handleClickOutside);
     }
   }, [showDropdown]);
-
-  const connectWallet = async () => {
-    if (!hashconnect) {
-      setError("Wallet connection not initialized");
-      return;
-    }
-
-    setIsConnecting(true);
-    setError(null);
-
-    try {
-      hashconnect.openPairingModal();
-    } catch (err: any) {
-      console.error("Wallet connection error:", err);
-      setError(err.message || "Failed to connect wallet");
-      setIsConnecting(false);
-    }
-  };
-
-  const disconnectWallet = async () => {
-    if (hashconnect && walletState.isConnected) {
-      try {
-        await hashconnect.disconnect();
-        setWalletState({
-          accountId: null,
-          isConnected: false,
-          walletName: null,
-        });
-      } catch (err) {
-        console.error("Disconnect error:", err);
-      }
-    }
-  };
 
   const formatAccountId = (accountId: string) => {
     if (accountId.length > 10) {
@@ -150,7 +45,7 @@ export default function WalletConnectButton() {
       <div className="relative">
         <Button
           onClick={connectWallet}
-          disabled={isConnecting || !hashconnect}
+          disabled={isConnecting || !connector}
           variant="outline"
           className="bg-background/95 backdrop-blur hover:bg-accent hover:text-accent-foreground transition-colors"
         >

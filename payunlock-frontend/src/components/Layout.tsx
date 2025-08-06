@@ -22,6 +22,7 @@ export function Layout({ children }: LayoutProps) {
                 <Link to="/create" className="hover:underline">Create Offer</Link>
                 <Link to="/verify" className="hover:underline">Verify</Link>
                 <Link to="/faq" className="hover:underline">FAQ</Link>
+                <Link to="/debug/wallet-sign" className="hover:underline">Debug</Link>
               </nav>
               <WalletConnectButton />
             </div>
