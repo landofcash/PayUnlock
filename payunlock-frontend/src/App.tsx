@@ -4,7 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { HomePage } from './pages/HomePage'
 import { OffersPage } from './pages/OffersPage'
 import { OfferDetailsPage } from './pages/OfferDetailsPage'
-import { CreateOfferPage } from './pages/CreateOfferPage'
+import { NewProductPage} from './pages/NewProductPage'
 import { MyOffersPage } from './pages/MyOffersPage'
 import { SendKeyPage } from './pages/SendKeyPage'
 import { MyPurchasesPage } from './pages/MyPurchasesPage'
@@ -29,7 +29,7 @@ function App() {
         <Route path="/offer/:id" element={<OfferDetailsPage />} />
 
         {/* Seller pages */}
-        <Route path="/create" element={<CreateOfferPage />} />
+        <Route path="/create" element={<NewProductPage />} />
         <Route path="/my-offers" element={<MyOffersPage />} />
         <Route path="/send-key/:id" element={<SendKeyPage />} />
 
