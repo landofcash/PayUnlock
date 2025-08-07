@@ -7,13 +7,13 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Copy, PenTool, Bug, AlertCircle } from "lucide-react";
 import { getCurrentConfig } from "@/config";
-import { useWallet } from "@/contexts/WalletContext";
-import { AccountId } from "@hashgraph/sdk";
-import {b64FromBytes, getHash} from "@/utils/encoding.ts";
+import { useAppKitAccount } from '@reown/appkit/react';
+import { getHash} from "@/utils/encoding.ts";
+import {useSignMessage} from "wagmi";
 
 export function WalletSignDebugPage() {
-  const { walletState, connector } = useWallet();
-  const { accountId, isConnected } = walletState;
+  const { address, isConnected } = useAppKitAccount();
+  const { signMessageAsync } = useSignMessage();
 
   const [dataToSign, setDataToSign] = useState("");
   const [signature, setSignature] = useState("");
@@ -21,9 +21,8 @@ export function WalletSignDebugPage() {
   const [error, setError] = useState("");
   const [bufferTest, setBufferTest] = useState("");
 
-
   const signData = async () => {
-    if (!connector || !isConnected) {
+    if (!isConnected) {
       setError("Wallet not connected");
       return;
     }
@@ -36,21 +35,14 @@ export function WalletSignDebugPage() {
     setIsSigning(true);
     setError("");
     setSignature("");
-
+    console.log(`signing:${dataToSign}`);
     try {
-      // Convert string to bytes for signing
-      const encoder = new TextEncoder();
-      const dataBytes = encoder.encode(dataToSign);
+      const signResult = await signMessageAsync({
+        message: dataToSign,
 
-      // Convert string accountId to AccountId object
-      const hederaAccountId = AccountId.fromString(accountId!);
+      });
 
-      // Get the signer for this account
-      const signer = connector.getSigner(hederaAccountId);
-
-
-      const signResult = await signer.sign([dataBytes]);
-      setSignature(b64FromBytes(signResult[0].signature));
+      setSignature(signResult);
 
     } catch (err: any) {
       console.error("Signing error:", err);
@@ -105,7 +97,7 @@ export function WalletSignDebugPage() {
           <AlertDescription>
             {isConnected ? (
               <span className="text-green-700">
-                Wallet connected: {accountId}
+                Wallet connected: {address}
               </span>
             ) : (
               <span className="text-orange-700">
@@ -200,8 +192,8 @@ export function WalletSignDebugPage() {
           <CardContent>
             <div className="text-xs text-muted-foreground space-y-1">
               <p>• Network: {config.name} ({config.networkId})</p>
-              <p>• Connected Account: {accountId || 'None'}</p>
-              <p>• Signing Method: Hedera wallet native signing</p>
+              <p>• Connected Account: {address || 'None'}</p>
+              <p>• Signing Method: EIP-155 personal_sign</p>
               <p>• Output Format: Hexadecimal string</p>
               <p>• Environment: Debug/Development</p>
               <p>{bufferTest}</p>

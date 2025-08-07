@@ -1,12 +1,20 @@
-import { Layout } from "../components/Layout";
-import { useState, useRef } from "react";
-import { getCurrentConfig } from "@/config";
-import { useWallet } from "@/contexts/WalletContext";
-import { AccountId } from "@hashgraph/sdk";
-import { b64FromBytes } from "@/utils/encoding";
-import { generateKeyPairFromB64, getEncryptionSeed } from "@/utils/keygen";
+import {Layout} from "../components/Layout";
+import {useState, useRef, useEffect} from "react";
+import {getCurrentConfig} from "@/config";
+import {b64FromBytes} from "@/utils/encoding";
+import {generateKeyPairFromB64, getEncryptionSeed} from "@/utils/keygen";
 import {generateAESKey, encryptWithECIES, encryptAES} from "@/utils/encryption";
 import {encodeBase64Uuid} from "@/utils/uuidBase64.ts";
+import {
+  useAccount,
+  useSignMessage,
+  usePublicClient,
+  useWalletClient
+} from "wagmi";
+import {useAppKit} from "@reown/appkit/react";
+import {encodeFunctionData, parseUnits, toHex} from "viem";
+import PayUnlockABI from "@/contracts/PayUnlock.sol/PayUnlock.json";
+
 
 // Interface for product form data
 interface ProductFormData {
@@ -33,6 +41,10 @@ interface EncryptedProductData {
 export function NewProductPage() {
   const seed = useRef(encodeBase64Uuid(crypto.randomUUID().toString()));
 
+  // Wagmi hooks
+  const {address, isConnected} = useAccount();
+  const {signMessageAsync} = useSignMessage();
+  const {open} = useAppKit();
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState<ProductFormData>({
     seed: seed.current,
@@ -42,10 +54,15 @@ export function NewProductPage() {
     price: "",
     payload: ""
   });
+  const publicClient = usePublicClient();
+  const walletClient = useWalletClient();
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [error, setError] = useState("");
   const [encryptedData, setEncryptedData] = useState<EncryptedProductData | null>(null);
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [isConfirmed, setIsConfirmed] = useState(false);
 
   // References to form elements
   const nameRef = useRef<HTMLInputElement>(null);
@@ -55,13 +72,14 @@ export function NewProductPage() {
   const payloadRef = useRef<HTMLTextAreaElement>(null);
 
   // Get wallet and config
-  const { walletState, connector } = useWallet();
-  const { accountId, isConnected } = walletState;
   const config = getCurrentConfig();
+
+  // Get PayUnlock contract
+  const contractAddress = config.contracts.payUnlock.address;
 
   // Handle form input changes
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { id, value } = e.target;
+    const {id, value} = e.target;
     setFormData(prev => ({
       ...prev,
       [id]: value
@@ -72,9 +90,14 @@ export function NewProductPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!isConnected) {
+      open();
+      return;
+    }
+
     // Collect form data
     const formData: ProductFormData = {
-      seed:seed.current,
+      seed: seed.current,
       name: nameRef.current?.value || "",
       description: descriptionRef.current?.value || "",
       tokenId: tokenRef.current?.value || "",
@@ -88,8 +111,8 @@ export function NewProductPage() {
 
   // Step 1: Encryption process
   const handleEncryption = async () => {
-    if (!connector || !isConnected) {
-      setError("Wallet not connected. Please connect your wallet first.");
+    if (!address || !isConnected) {
+      setError("Please connect your wallet first");
       return;
     }
 
@@ -98,22 +121,33 @@ export function NewProductPage() {
     setCurrentStep(1);
 
     try {
-      const encoder = new TextEncoder();
-      const seedBytes = encoder.encode(getEncryptionSeed(seed.current));
-      const hederaAccountId = AccountId.fromString(accountId!);
-      const signer = connector.getSigner(hederaAccountId);
-      const signResult = await signer.sign([seedBytes]);
-      const signature = signResult[0].signature;
-      const signatureBase64 = b64FromBytes(signature);
+      // Create message to sign
+      const seedMessage = getEncryptionSeed(seed.current);
+
+      // Sign message with wagmi
+      const signature = await signMessageAsync({
+        message: seedMessage,
+      });
+
+      if (!signature) {
+        throw new Error("Failed to sign message");
+      }
+
+      // Convert hex signature to base64
+      const signatureBytes = new Uint8Array(
+        signature.slice(2).match(/.{1,2}/g)!.map(byte => parseInt(byte, 16))
+      );
+      const signatureBase64 = b64FromBytes(signatureBytes);
+
       const aesKey = await generateAESKey();
-      const encryptedPayload= await encryptAES(aesKey,formData.payload);
+      const encryptedPayload = await encryptAES(aesKey, formData.payload);
 
       const keyPair = await generateKeyPairFromB64(signatureBase64);
       const encryptedKey = await encryptWithECIES(keyPair.publicKey, aesKey);
 
       // Store encrypted data
       setEncryptedData({
-        seed:seed.current,
+        seed: seed.current,
         name: formData.name,
         description: formData.description,
         tokenId: formData.tokenId,
@@ -134,19 +168,20 @@ export function NewProductPage() {
 
   // Step 2: Store on blockchain
   const handleBlockchainStorage = async () => {
-    if (!encryptedData) {
-      setError("No encrypted data available. Please complete Step 1 first.");
+    if (!encryptedData || !address) {
+      setError("No encrypted data available or wallet not connected. Please complete Step 1 first.");
+      return;
+    }
+    if(!walletClient.data || !publicClient) {
+      setError("Wallet client not available. Please connect your wallet first.");
       return;
     }
 
     setIsProcessing(true);
+    setIsConfirming(true);
     setError("");
 
     try {
-      // This would be implemented with actual smart contract calls
-      // For now, we'll just simulate the process
-      console.log("Storing product data on blockchain:", encryptedData);
-
       // Create metadata JSON that would be stored in Hedera file
       const metadata = {
         name: encryptedData.name,
@@ -155,19 +190,75 @@ export function NewProductPage() {
         price: encryptedData.price,
         publicKey: encryptedData.publicKey,
         createdAt: new Date().toISOString(),
-        seller: accountId
+        seller: address
       };
 
       console.log("Product metadata to be stored:", metadata);
 
-      // Simulate blockchain storage delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Create a unique file ID for the product
+      const fileId = `${seed.current}`;
 
-      // Success - would redirect to product page or show success message
-      alert("Product successfully created and stored on blockchain!");
+      // Get the currency address (zero address for HBAR)
+      const currency = encryptedData.tokenId === "0.0.0"
+        ? "0x0000000000000000000000000000000000000000"
+        : encryptedData.tokenId;
+
+      // Parse price based on token decimals (assuming 18 decimals for most tokens, 8 for HBAR)
+      const decimals = encryptedData.tokenId === "0.0.0" ? 8 : 18;
+      const priceInWei = parseUnits(encryptedData.price, decimals);
+
+      const data = encodeFunctionData({
+        abi: PayUnlockABI.abi,
+        functionName: 'createProduct',
+        args: [fileId, priceInWei, currency, toHex(encryptedData.publicKey)],
+      });
+
+      console.log(`Sending transaction...`);
+      const hash = await walletClient.data.sendTransaction({
+        to: contractAddress as `0x${string}`,
+        data
+      });
+
+      console.log(`Transaction sent: ${hash}`);
+      console.log(`Waiting for confirmation...`);
+
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      console.log(`Transaction confirmed with status: ${receipt.status}`);
+      console.log(`Gas used: ${receipt.gasUsed.toString()}`);
+
+      if (receipt.status === 'success') {
+        setIsConfirmed(true);
+        console.log("Product created on blockchain successfully!");
+        alert(`Product successfully created!`);
+      } else {
+        throw new Error('Transaction failed');
+      }
+
+    } catch (err: any) {
+      console.error("Blockchain storage error:", err);
+      // Provide more specific error messages based on the error type
+      if (err.name === 'ContractFunctionExecutionError') {
+        setError(`Smart contract error: ${err.shortMessage || err.message}`);
+      } else if (err.name === 'InsufficientFundsError') {
+        setError("Insufficient funds to complete this transaction");
+      } else if (err.name === 'UserRejectedRequestError') {
+        setError("Transaction was rejected by user");
+      } else {
+        setError(`Blockchain storage failed: ${err.message}`);
+      }
+    } finally {
+      setIsProcessing(false);
+      setIsConfirming(false);
+    }
+  };
+
+  // Handle success state
+  useEffect(() => {
+    if (isConfirmed && encryptedData) {
+      // Reset form and state after confirmation
       setShowModal(false);
 
-      // Reset form and state
+      // Reset form
       if (nameRef.current) nameRef.current.value = "";
       if (descriptionRef.current) descriptionRef.current.value = "";
       if (tokenRef.current) tokenRef.current.value = config.supportedTokens[0].id;
@@ -175,7 +266,7 @@ export function NewProductPage() {
       if (payloadRef.current) payloadRef.current.value = "";
 
       setFormData({
-        seed:seed.current,
+        seed: seed.current,
         name: "",
         description: "",
         tokenId: "",
@@ -185,14 +276,11 @@ export function NewProductPage() {
 
       setEncryptedData(null);
       setCurrentStep(0);
-
-    } catch (err: any) {
-      console.error("Blockchain storage error:", err);
-      setError(`Blockchain storage failed: ${err.message}`);
-    } finally {
       setIsProcessing(false);
+      setIsConfirmed(false);
+      setIsConfirming(false);
     }
-  };
+  }, [isConfirmed, encryptedData, config.supportedTokens]);
 
   return (
     <Layout>
@@ -206,30 +294,18 @@ export function NewProductPage() {
               <label htmlFor="name" className="block mb-2">
                 Product Name
               </label>
-              <input
-                type="text"
-                id="name"
-                ref={nameRef}
-                className="w-full p-2 border border-input rounded-md"
-                placeholder="e.g., Windows 11 Pro License"
-                onChange={handleInputChange}
-                required
-              />
+              <input type="text" id="name" ref={nameRef} className="w-full p-2 border border-input rounded-md"
+                     placeholder="e.g., Windows 11 Pro License" onChange={handleInputChange} required/>
             </div>
 
             <div>
               <label htmlFor="description" className="block mb-2">
                 Description
               </label>
-              <textarea
-                id="description"
-                ref={descriptionRef}
-                rows={4}
-                className="w-full p-2 border border-input rounded-md"
-                placeholder="Provide detailed information about your digital product..."
-                onChange={handleInputChange}
-                required
-              ></textarea>
+              <textarea id="description" ref={descriptionRef} rows={4}
+                        className="w-full p-2 border border-input rounded-md"
+                        placeholder="Provide detailed information about your digital product..."
+                        onChange={handleInputChange} required></textarea>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -237,17 +313,11 @@ export function NewProductPage() {
                 <label htmlFor="token" className="block mb-2">
                   Token
                 </label>
-                <select
-                  id="token"
-                  ref={tokenRef}
-                  className="w-full p-2 border border-input rounded-md"
-                  onChange={handleInputChange}
-                  required
-                >
+                <select id="token" ref={tokenRef} className="w-full p-2 border border-input rounded-md"
+                        onChange={handleInputChange} required>
                   {config.supportedTokens.map((token) => (
                     <option key={token.id} value={token.id}>
-                      {token.name} ({token.symbol})
-                    </option>
+                      {token.name} ({token.symbol}) </option>
                   ))}
                 </select>
               </div>
@@ -256,17 +326,8 @@ export function NewProductPage() {
                 <label htmlFor="price" className="block mb-2">
                   Price
                 </label>
-                <input
-                  type="number"
-                  id="price"
-                  ref={priceRef}
-                  className="w-full p-2 border border-input rounded-md"
-                  placeholder="0.00"
-                  min="0"
-                  step="0.01"
-                  onChange={handleInputChange}
-                  required
-                />
+                <input type="number" id="price" ref={priceRef} className="w-full p-2 border border-input rounded-md"
+                       placeholder="0.00" min="0" step="0.01" onChange={handleInputChange} required/>
               </div>
             </div>
 
@@ -274,23 +335,15 @@ export function NewProductPage() {
               <label htmlFor="payload" className="block mb-2">
                 Payload
               </label>
-              <textarea
-                id="payload"
-                ref={payloadRef}
-                rows={4}
-                className="w-full p-2 border border-input rounded-md"
-                placeholder="Enter the payload content that will be encrypted..."
-                onChange={handleInputChange}
-                required
-              ></textarea>
+              <textarea id="payload" ref={payloadRef} rows={4} className="w-full p-2 border border-input rounded-md"
+                        placeholder="Enter the payload content that will be encrypted..." onChange={handleInputChange}
+                        required></textarea>
             </div>
 
             <div className="pt-4">
-              <button
-                type="submit"
-                className="w-full bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
-              >
-                Create Product
+              <button type="submit"
+                      className="w-full bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors">
+                {!isConnected ? "Connect Wallet" : "Create Product"}
               </button>
             </div>
           </form>
@@ -311,12 +364,11 @@ export function NewProductPage() {
               <div className={`mb-4 ${currentStep === 1 ? 'bg-blue-50 p-3 border border-blue-200 rounded-md' : ''}`}>
                 <h3 className="font-semibold mb-2">Step 1: Encryption</h3>
                 <p className="text-sm text-gray-600">
-                  • Sign the product seed with your wallet<br />
-                  • Create ECIES key pair derived from the signature<br />
-                  • Create new AES key<br />
-                  • Encrypt payload with AES<br />
-                  • Encrypt key with ECIES
-                </p>
+                  • Sign the product seed with your wallet<br/>
+                  • Create ECIES key pair derived from the signature<br/>
+                  • Create new AES key<br/>
+                  • Encrypt payload with AES<br/>
+                  • Encrypt key with ECIES </p>
                 {currentStep === 1 && isProcessing && (
                   <div className="mt-2 text-blue-600 text-sm">Processing...</div>
                 )}
@@ -328,46 +380,41 @@ export function NewProductPage() {
               <div className={`mb-6 ${currentStep === 2 ? 'bg-blue-50 p-3 border border-blue-200 rounded-md' : ''}`}>
                 <h3 className="font-semibold mb-2">Step 2: Blockchain Storage</h3>
                 <p className="text-sm text-gray-600">
-                  • Call smart contract to store the product data on chain<br />
-                  • Product metadata will be stored in Hedera file as JSON
-                </p>
+                  • Call smart contract to store the product data on chain<br/>
+                  • Product metadata will be stored in Hedera file as JSON </p>
                 {currentStep === 2 && isProcessing && (
                   <div className="mt-2 text-blue-600 text-sm">Processing...</div>
+                )}
+                {currentStep === 2 && isConfirming && (
+                  <div className="mt-2 text-blue-600 text-sm">Waiting for transaction confirmation...</div>
+                )}
+                {isConfirmed && (
+                  <div className="mt-2 text-green-600 text-sm">✓ Transaction confirmed!</div>
                 )}
               </div>
 
               <div className="flex justify-end">
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md mr-2 hover:bg-gray-300 transition-colors"
-                  disabled={isProcessing}
-                >
+                <button onClick={() => setShowModal(false)}
+                        className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md mr-2 hover:bg-gray-300 transition-colors"
+                        disabled={isProcessing || isConfirming}>
                   Cancel
                 </button>
                 {currentStep === 0 && (
-                  <button
-                    onClick={handleEncryption}
-                    className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
-                    disabled={isProcessing || !isConnected}
-                  >
-                    Start Process
-                  </button>
+                  <button onClick={handleEncryption}
+                          className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
+                          disabled={isProcessing || !isConnected}>
+                    Start Process </button>
                 )}
                 {currentStep === 1 && (
-                  <button
-                    disabled={true}
-                    className="bg-primary text-primary-foreground px-4 py-2 rounded-md opacity-50 cursor-not-allowed"
-                  >
-                    Proceed
-                  </button>
+                  <button disabled={true}
+                          className="bg-primary text-primary-foreground px-4 py-2 rounded-md opacity-50 cursor-not-allowed">
+                    Proceed </button>
                 )}
-                {currentStep === 2 && (
-                  <button
-                    onClick={handleBlockchainStorage}
-                    className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
-                    disabled={isProcessing}
-                  >
-                    Store on Blockchain
+                {currentStep === 2 && !isConfirmed && (
+                  <button onClick={handleBlockchainStorage}
+                          className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
+                          disabled={isProcessing || isConfirming}>
+                    {isConfirming ? "Confirming..." : "Store on Blockchain"}
                   </button>
                 )}
               </div>

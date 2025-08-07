@@ -16,6 +16,8 @@ import { AdminOrdersPage } from './pages/AdminOrdersPage'
 import { FAQPage } from './pages/FAQPage'
 import { TermsPage } from './pages/TermsPage'
 import {WalletSignDebugPage} from "@/pages/Debug/WalletSignDebugPage.tsx";
+import TestAppKitPage from './pages/Debug/TestAppKitPage'
+import CreateProductDebug from "@/pages/Debug/CreateProductDebug.tsx";
 
 function App() {
   return (
@@ -50,6 +52,9 @@ function App() {
         <Route path="/terms" element={<TermsPage />} />
 
         <Route path="/debug/wallet-sign" element={<WalletSignDebugPage />} />
+        <Route path="/debug/test-contract" element={<TestAppKitPage />} />
+        <Route path="/debug/test-create" element={<CreateProductDebug />} />
+
 
         {/* Fallback for unknown routes */}
         <Route path="*" element={<Navigate to="/" replace />} />
