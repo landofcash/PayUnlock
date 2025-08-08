@@ -130,7 +130,7 @@ export function OffersPage() {
   return (
     <Layout>
       <div>
-        <h1 className="text-3xl font-bold mb-6">Available Offers</h1>
+        <h1 className="text-3xl font-bold mb-6">Available Products</h1>
         <p className="mb-8">Browse all available digital products</p>
 
         {isLoading && (
