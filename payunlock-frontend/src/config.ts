@@ -44,7 +44,7 @@ const configs: Record<'testnet' | 'mainnet', NetworkConfig> = {
       { id: '0.0.0', name: 'HBAR', decimals: 8, symbol: 'HBAR' },
       // Add other testnet tokens as needed
     ],
-    fileApiUrl: 'http://localhost:3000/api/cdn',
+    fileApiUrl: 'https://proud-liberation-production-ae74.up.railway.app/api/cdn',
     apiUrl: 'https://testnet.hashio.io/api',
     explorerBaseUrl: 'https://hashscan.io/testnet',
     mirrorNodeUrl: 'https://testnet.mirrornode.hedera.com',
@@ -73,7 +73,7 @@ const configs: Record<'testnet' | 'mainnet', NetworkConfig> = {
       { id: '0.0.0', name: 'HBAR', decimals: 8, symbol: 'HBAR' },
       // Add other mainnet tokens as needed
     ],
-    fileApiUrl: 'http://localhost:3000/api/cdn',
+    fileApiUrl: 'https://proud-liberation-production-ae74.up.railway.app/api/cdn',
     apiUrl: 'https://mainnet.hashio.io/api',
     explorerBaseUrl: 'https://hashscan.io/mainnet',
     mirrorNodeUrl: 'https://mainnet.mirrornode.hedera.com',
