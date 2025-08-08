@@ -1,10 +1,12 @@
-# PayUnlock - Secure Digital Marketplace on Hedera
+# PayUnlock - Secure Digital Marketplace on Hedera network.
 
-PayUnlock is a decentralized escrow marketplace for digital products, powered by Hedera blockchain technology. It provides a secure platform for buying and selling digital content with built-in protection for both parties through smart contract escrow.
+PayUnlock is a decentralized escrow marketplace for digital products, powered by Hedera network technology. It provides a secure platform for buying and selling digital content with built-in protection for both parties through smart contract escrow.
+
+There is no database or server side storage other than Hedera contracts and encrypted metadata files.
 
 ## Project Description
 
-PayUnlock is redefining digital commerce by removing intermediaries and guaranteeing secure delivery of digital products. Powered by advanced cryptography and Hedera smart contracts, it creates a trustless environment where buyers can verify content before payment is released. This DeFi-driven model brings practical, real-world use cases to blockchain, with security, transparency, and a seamless user experience at its core.
+PayUnlock is redefining digital commerce by removing intermediaries and guaranteeing secure delivery of digital products. Powered by advanced cryptography and Hedera smart contracts, it creates a trustless environment where buyers can verify content before payment is released. This DeFi-driven model brings practical, real-world use cases to hashgraph, with security, transparency, and a seamless user experience at its core.
 
 ## Project Structure
 
@@ -12,7 +14,22 @@ PayUnlock is redefining digital commerce by removing intermediaries and guarante
 - **Smart Contract** - Hedera Smart Contract is in payunlock-contract folder
 - **Sync Service** - Basic caching service is in payunlock-sync folder
 
+--
 
+- **NO BACKEND** - PayUnlock is fully decentralized solution.  
+
+## Encryption Flow
+**Seller: Initial Product Creation, (New Product Action)**
+![](https://i.gyazo.com/cdb7f80840f6824a0a0fbed3926ec9a0.png)
+
+**Buyer: Creation of the buyer public key, (Buy Action)**
+![](https://i.gyazo.com/ce43ed1d7e894824329e53a225d97755.png)
+
+**Seller: Encryption of the symmetric key for the buyer (send code action):**
+![](https://i.gyazo.com/1efd1626cfbbc2f96665c7650baaabeb.png)
+
+**Buyer: Open product payload (Complete action):**
+![](https://i.gyazo.com/1e85ca2b12937bf0b495bac53b3c7ca0.png)
 
 ## Tech Stack
 
@@ -23,8 +40,8 @@ PayUnlock is redefining digital commerce by removing intermediaries and guarante
 - **TailwindCSS** - Utility-first CSS framework for styling
 - **Shadcn UI** - Unstyled, accessible UI components
 
-### Blockchain & Cryptography
-- **Hedera Blockchain** - Fast, secure, and energy-efficient public ledger
+### Hedera & Cryptography
+- **Hedera hashgraph** - Fast, secure, and energy-efficient public ledger
 - **@reown/appkit** - SDK for Hedera integration
 - **Wagmi** - React hooks for Ethereum/Hedera
 - **Viem** - TypeScript interface for Ethereum/Hedera
@@ -34,7 +51,6 @@ PayUnlock is redefining digital commerce by removing intermediaries and guarante
 - **AES-GCM** - Advanced Encryption Standard with Galois/Counter Mode for symmetric encryption
 
 ## Key Features
-- 
 - **End-to-End Encryption**: All digital content is encrypted to protect both buyers and sellers
 - **Secure Escrow System**: Payments are held in a Hedera smart contract until delivery is confirmed
 - **Wallet Integration**: Seamless connection with Hedera wallets
@@ -78,4 +94,4 @@ https://kroki.io/mermaid/svg/eNqdVd9v2jAQfuevsFJpohLVYjuEEG3VGD-mai_VumkPqA8uMSU
 
 ## Hedera Hackathon - DeFi Track
 
-This project was developed for the Hedera Hackathon, DeFi track. It demonstrates how blockchain technology can be applied to real-world financial transactions beyond traditional cryptocurrency use cases, creating a secure and efficient marketplace for digital goods.
+This project was developed for the Hedera Hackathon, DeFi track. It demonstrates how Hedera technology can be applied to real-world financial transactions beyond traditional cryptocurrency use cases, creating a secure and efficient marketplace for digital goods.
