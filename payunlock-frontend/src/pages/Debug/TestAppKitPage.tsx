@@ -5,8 +5,9 @@ import { encodeFunctionData, keccak256, toHex } from 'viem'
 
 import PayUnlockABI from '@/contracts/PayUnlock.sol/PayUnlock.json';
 import {Layout} from "@/components/Layout.tsx";
+import { getCurrentConfig } from "@/config";
 
-const CONTRACT_ADDRESS = '0x953aFC7f6d3201D7D76BB146542E144b31504Ac5';
+const CONTRACT_ADDRESS = getCurrentConfig().contracts.payUnlock.address;
 const EXPECTED_CHAIN_ID = 296;
 
 export default function DebugContractTest() {

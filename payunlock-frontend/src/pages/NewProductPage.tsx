@@ -194,19 +194,6 @@ export function NewProductPage() {
     setError("");
 
     try {
-      // Create metadata JSON that would be stored in Hedera file
-      const metadata = {
-        name: encryptedData.name,
-        description: encryptedData.description,
-        tokenId: encryptedData.tokenId,
-        price: encryptedData.price,
-        publicKey: encryptedData.publicKey,
-        createdAt: new Date().toISOString(),
-        seller: address
-      };
-
-      console.log("Product metadata to be stored:", metadata);
-
       // Create a unique file ID for the product
       const fileId = `${seed.current}`;
 
@@ -222,7 +209,13 @@ export function NewProductPage() {
       const data = encodeFunctionData({
         abi: PayUnlockABI.abi,
         functionName: 'createProduct',
-        args: [fileId, priceInWei, currency, toHex(encryptedData.publicKey)],
+        args: [
+          fileId,
+          priceInWei,
+          currency,
+          toHex(encryptedData.publicKey),
+          toHex(encryptedData.encryptedKey),
+          ],
       });
 
       console.log(`Sending transaction...`);

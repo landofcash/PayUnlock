@@ -66,7 +66,8 @@ contract PayUnlock {
     string calldata fileId,
     uint256 price,
     address currency,           // address(0) for HBAR, or ERC-20/HTS mirror address
-    bytes   calldata sellerPubKey
+    bytes calldata sellerPubKey,
+    bytes calldata encryptedSymKey
   ) external returns (uint256 id) {
     require(price > 0, "price=0");
 
@@ -80,7 +81,7 @@ contract PayUnlock {
       buyer: address(0),
       sellerPubKey: sellerPubKey,
       buyerPubKey: "",
-      encryptedSymKey: "",
+      encryptedSymKey: encryptedSymKey,
       sendCodeWindow: DEFAULT_SEND_CODE_WINDOW,
       confirmWindow: DEFAULT_CONFIRM_WINDOW,
       paidAt: 0,
@@ -141,7 +142,6 @@ contract PayUnlock {
     Product storage p = products[id];
     require(p.status == Status.Paid, "not in Paid");
     require(p.buyer != address(0), "no buyer");
-    require(p.encryptedSymKey.length == 0, "already sent");
     require(encryptedSymKey.length > 0, "empty key");
 
     p.encryptedSymKey = encryptedSymKey;

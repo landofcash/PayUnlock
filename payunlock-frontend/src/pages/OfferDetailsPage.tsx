@@ -7,9 +7,10 @@ import { formatUnits, parseUnits, encodeFunctionData, toHex } from "viem";
 import PayUnlockABI from "@/contracts/PayUnlock.sol/PayUnlock.json";
 import { getCurrentConfig } from "@/config";
 import { useAppKit } from "@reown/appkit/react";
-import { ShoppingCart, ChevronDown, ChevronUp } from "lucide-react";
+import { ShoppingCart, ChevronDown, ChevronUp, Key } from "lucide-react";
 import { b64FromBytes } from "@/utils/encoding";
 import { generateKeyPairFromB64, getEncryptionSeed } from "@/utils/keygen";
+import { decryptWithECIES, encryptWithECIES } from "@/utils/encryption";
 
 
 
@@ -53,13 +54,24 @@ export function OfferDetailsPage() {
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
 
-  // Modal state
+  // Buyer modal state
   const [showModal, setShowModal] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [buyerKeyPair, setBuyerKeyPair] = useState<{ privateKey: string, publicKey: string } | null>(null);
+
+  // Seller modal state
+  const [showSellerModal, setShowSellerModal] = useState(false);
+  const [sellerCurrentStep, setSellerCurrentStep] = useState(0);
+  const [isSellerProcessing, setIsSellerProcessing] = useState(false);
+  const [isSellerConfirming, setIsSellerConfirming] = useState(false);
+  const [isSellerConfirmed, setIsSellerConfirmed] = useState(false);
+  const [sellerKeyPair, setSellerKeyPair] = useState<{ privateKey: string, publicKey: string } | null>(null);
+  const [sellerError, setSellerError] = useState<string | null>(null);
+  const [encryptedSymKeyForBuyer, setEncryptedSymKeyForBuyer] = useState<string | null>(null);
+
   // State to control the expansion of the details section
   const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
 
@@ -106,6 +118,177 @@ export function OfferDetailsPage() {
 
     // Show the modal
     setShowModal(true);
+  };
+
+  // Handle seller send code button click - opens the seller modal
+  const handleSellerSendCode = () => {
+    if (!product || !isConnected || !address) {
+      if (!isConnected) {
+        open(); // Open wallet connection dialog
+      }
+      return;
+    }
+
+    // Reset seller modal state
+    setSellerCurrentStep(0);
+    setSellerKeyPair(null);
+    setIsSellerProcessing(false);
+    setIsSellerConfirming(false);
+    setIsSellerConfirmed(false);
+    setSellerError(null);
+    setEncryptedSymKeyForBuyer(null);
+
+    // Show the seller modal
+    setShowSellerModal(true);
+  };
+
+  // Step 1 for seller: Sign the seed, derive ECIES key pair, decrypt symmetric key, encrypt with buyer's public key
+  const handleSellerSignAndEncrypt = async () => {
+    if (!product || !isConnected || !product.buyerPublicKey) {
+      setSellerError("Missing product data or buyer public key");
+      return;
+    }
+
+    setIsSellerProcessing(true);
+    setSellerError(null);
+    setSellerCurrentStep(1);
+
+    try {
+      // Create message to sign using the product's fileId as the seed
+      const seedMessage = getEncryptionSeed(product.fileId);
+
+      // Sign message with wagmi
+      const signature = await signMessageAsync({
+        message: seedMessage,
+      });
+
+      if (!signature) {
+        throw new Error("Failed to sign message");
+      }
+
+      // Convert hex signature to base64
+      const signatureBytes = new Uint8Array(
+        signature.slice(2).match(/.{1,2}/g)!.map(byte => parseInt(byte, 16))
+      );
+      const signatureBase64 = b64FromBytes(signatureBytes);
+
+      // Generate key pair from signature
+      const keyPair = await generateKeyPairFromB64(signatureBase64);
+
+      // Store the key pair
+      setSellerKeyPair(keyPair);
+
+      // Get the encrypted symmetric key from the product
+      if (!product.sellerPubKey) {
+        throw new Error("Seller public key not found in product data");
+      }
+
+      // Check if we have an encrypted symmetric key stored in the product
+      if (!product.encryptedSymKey) {
+        // This is a special case where we need to create a new symmetric key
+        // For this implementation, we'll throw an error as this should not happen
+        throw new Error("No encrypted symmetric key found in product data");
+      }
+
+      // Decrypt the symmetric key using the seller's private key
+      const symmetricKey = await decryptWithECIES(keyPair.privateKey, product.encryptedSymKey);
+
+      // Encrypt the symmetric key with the buyer's public key
+      const encryptedKeyForBuyer = await encryptWithECIES(product.buyerPublicKey, symmetricKey);
+
+      // Store the encrypted key for the buyer
+      setEncryptedSymKeyForBuyer(encryptedKeyForBuyer);
+
+      // Move to next step
+      setSellerCurrentStep(2);
+    } catch (err: any) {
+      console.error("Signing and encryption error:", err);
+      setSellerError(`Process failed: ${err.message}`);
+    } finally {
+      setIsSellerProcessing(false);
+    }
+  };
+
+  // Step 2 for seller: Call the smart contract method sendCode with the order ID and encrypted symmetric key
+  const handleSellerSendCodeToBlockchain = async () => {
+    if (!product || !isConnected || !walletClient.data || !address || !publicClient || !encryptedSymKeyForBuyer) {
+      setSellerError("Missing required data. Please complete Step 1 first.");
+      return;
+    }
+
+    setIsSellerProcessing(true);
+    setIsSellerConfirming(true);
+    setSellerError(null);
+
+    try {
+      // Parse the product ID
+      const productId = parseInt(product.id);
+
+      // Convert the encrypted symmetric key to hex format for the blockchain
+      const encryptedKeyHex = toHex(Buffer.from(encryptedSymKeyForBuyer, 'base64'));
+
+      console.log("Calling sendCode with productId:", productId, "encryptedKeyHex:", encryptedKeyHex);
+
+      // Encode the function call
+      const data = encodeFunctionData({
+        abi: PayUnlockABI.abi,
+        functionName: 'sendCode',
+        args: [productId, encryptedKeyHex],
+      });
+
+      // Simulate the transaction first to check for errors
+      try {
+        const result = await publicClient.simulateContract({
+          address: contractAddress as `0x${string}`,
+          abi: PayUnlockABI.abi,
+          functionName: 'sendCode',
+          args: [productId, encryptedKeyHex],
+          account: address as `0x${string}`,
+        });
+        console.log(`✅ Simulation successful ${JSON.stringify(result, null, 2) || 'No result returned'}`);
+      } catch (simError: any) {
+        console.log(`❌ Simulation failed: ${simError.shortMessage || simError.message}`);
+        throw simError;
+      }
+
+      // Send the transaction
+      const hash = await walletClient.data.sendTransaction({
+        to: contractAddress as `0x${string}`,
+        data,
+      });
+
+      console.log(`Transaction sent: ${hash}`);
+
+      // Wait for the transaction to be confirmed
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+
+      if (receipt.status === 'success') {
+        setIsSellerConfirmed(true);
+        console.log("Access code sent successfully!");
+
+        // Wait a moment before closing the modal and refreshing
+        setTimeout(() => {
+          setShowSellerModal(false);
+          window.location.reload();
+        }, 2000);
+      } else {
+        throw new Error('Transaction failed');
+      }
+
+    } catch (err: any) {
+      console.error("Send code error:", err);
+      // Provide more specific error messages based on the error type
+      if (err.name === 'ContractFunctionExecutionError') {
+        setSellerError(`Smart contract error: ${err.shortMessage || err.message}`);
+      } else if (err.name === 'UserRejectedRequestError') {
+        setSellerError("Transaction was rejected by user");
+      } else {
+        setSellerError(`Send code failed: ${err.message}`);
+      }
+    } finally {
+      setIsSellerProcessing(false);
+      setIsSellerConfirming(false);
+    }
   };
 
   // Step 1: Sign the product seed and derive ECIES key pair
@@ -284,14 +467,13 @@ export function OfferDetailsPage() {
         // Format the price (assuming 8 decimals for HBAR, 18 for other tokens)
         const decimals = currency === "0x0000000000000000000000000000000000000000" ? 8 : 18;
         const formattedPrice = formatUnits(price, decimals);
-        const formattedSeller = seller.substring(0, 6) + "..." + seller.substring(seller.length - 4);
 
         // Prepare buyer information if product is paid
         let buyerInfo: { buyer?: string; buyerPublicKey?: string; paidAt?: Date } = {};
         console.log("buyer:",buyer, "buyerPubKey:",buyerPubKey, "paidAt:",paidAt);
         if (status === 1) { // Product is paid
           buyerInfo = {
-            buyer: buyer ? `${buyer.substring(0, 6)}...${buyer.substring(buyer.length - 4)}` : undefined,
+            buyer: buyer ? buyer : undefined,
             buyerPublicKey: buyerPubKey ? Buffer.from(buyerPubKey.slice(2), 'hex').toString() : undefined,
             paidAt: paidAt ? new Date(Number(paidAt*1000n)) : undefined
           };
@@ -303,7 +485,7 @@ export function OfferDetailsPage() {
           name,
           description,
           price: formattedPrice,
-          seller: formattedSeller,
+          seller: seller,
           fileId,
           status,
           currency,
@@ -383,6 +565,16 @@ export function OfferDetailsPage() {
                       <span>Buy</span>
                     </button>
                   )}
+                  {product.status === 1 && address && product.seller.toLowerCase() === address.toLowerCase() && (
+                    <button
+                      onClick={handleSellerSendCode}
+                      disabled={isSellerProcessing || !isConnected}
+                      className="w-full bg-blue-600 text-white px-4 py-2 rounded-md font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 border border-blue-500 shadow-sm"
+                    >
+                      <Key className="w-4 h-4" />
+                      <span>Send Access Code</span>
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -413,6 +605,10 @@ export function OfferDetailsPage() {
                   <div className="bg-gray-50 p-3 rounded-md border border-gray-200 overflow-x-auto transition-all duration-300 ease-in-out">
                     <table className="w-full text-sm">
                       <tbody>
+                      <tr className="border-b border-gray-200">
+                        <td className="py-1 pr-3 font-medium text-gray-700 whitespace-nowrap">Connected Address:</td>
+                        <td className="py-1 pl-3">{address}</td>
+                      </tr>
                         <tr className="border-b border-gray-200">
                           <td className="py-1 pr-3 font-medium text-gray-700 whitespace-nowrap">Order ID (Seed):</td>
                           <td className="py-1 pl-3">{product.id} ({product.fileId})</td>
@@ -586,6 +782,82 @@ export function OfferDetailsPage() {
                         className="bg-primary text-primary-foreground px-6 py-2 rounded-md hover:bg-primary/90 transition-colors font-medium"
                         disabled={isProcessing || isConfirming}>
                   {isConfirming ? "Processing..." : "Complete Purchase"}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Seller Modal */}
+      {showSellerModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+            <h2 className="text-xl font-bold mb-4">Send Access Code to Buyer</h2>
+
+            {sellerError && (
+              <div className="mb-4 p-3 bg-red-100 border border-red-300 text-red-700 rounded-md">
+                {sellerError}
+              </div>
+            )}
+
+            <div className={`mb-4 ${sellerCurrentStep === 1 ? 'bg-blue-50 p-3 border border-blue-200 rounded-md' : ''}`}>
+              <h3 className="font-semibold mb-2">Step 1: Prepare Access Code</h3>
+              <p className="text-sm text-gray-600">
+                • Sign a message to verify your identity<br/>
+                • Decrypt your symmetric key<br/>
+                • Encrypt it with buyer's public key
+              </p>
+              {sellerCurrentStep === 1 && isSellerProcessing && (
+                <div className="mt-2 text-blue-600 text-sm">Preparing access code...</div>
+              )}
+              {sellerCurrentStep > 1 && (
+                <div className="mt-2 text-green-600 text-sm">✓ Access code prepared</div>
+              )}
+            </div>
+
+            <div className={`mb-6 ${sellerCurrentStep === 2 ? 'bg-blue-50 p-3 border border-blue-200 rounded-md' : ''}`}>
+              <h3 className="font-semibold mb-2">Step 2: Send to Buyer</h3>
+              <p className="text-sm text-gray-600">
+                • Send the encrypted access code to the blockchain<br/>
+                • Make it available for the buyer to access<br/>
+                • Complete the transaction
+              </p>
+              {sellerCurrentStep === 2 && isSellerProcessing && (
+                <div className="mt-2 text-blue-600 text-sm">Sending access code...</div>
+              )}
+              {sellerCurrentStep === 2 && isSellerConfirming && (
+                <div className="mt-2 text-blue-600 text-sm">Confirming transaction...</div>
+              )}
+              {isSellerConfirmed && (
+                <div className="mt-2 text-green-600 text-sm">✓ Access code sent successfully!</div>
+              )}
+            </div>
+
+            <div className="flex justify-end mt-4">
+              <button onClick={() => setShowSellerModal(false)}
+                      className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md mr-3 hover:bg-gray-300 transition-colors font-medium"
+                      disabled={isSellerProcessing || isSellerConfirming}>
+                {isSellerProcessing ? "Please Wait..." : "Cancel"}
+              </button>
+              {sellerCurrentStep === 0 && (
+                <button onClick={handleSellerSignAndEncrypt}
+                        className="bg-primary text-primary-foreground px-6 py-2 rounded-md hover:bg-primary/90 transition-colors font-medium"
+                        disabled={isSellerProcessing || !isConnected}>
+                  Begin Process
+                </button>
+              )}
+              {sellerCurrentStep === 1 && (
+                <button disabled={true}
+                        className="bg-primary text-primary-foreground px-6 py-2 rounded-md opacity-50 cursor-not-allowed font-medium">
+                  Processing...
+                </button>
+              )}
+              {sellerCurrentStep === 2 && !isSellerConfirmed && (
+                <button onClick={handleSellerSendCodeToBlockchain}
+                        className="bg-primary text-primary-foreground px-6 py-2 rounded-md hover:bg-primary/90 transition-colors font-medium"
+                        disabled={isSellerProcessing || isSellerConfirming}>
+                  {isSellerConfirming ? "Processing..." : "Send Access Code"}
                 </button>
               )}
             </div>
