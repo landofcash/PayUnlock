@@ -10,7 +10,7 @@ import { useAppKit } from "@reown/appkit/react";
 import { ShoppingCart, ChevronDown, ChevronUp, Key } from "lucide-react";
 import { b64FromBytes } from "@/utils/encoding";
 import { generateKeyPairFromB64, getEncryptionSeed } from "@/utils/keygen";
-import { decryptWithECIES, encryptWithECIES } from "@/utils/encryption";
+import {decryptAES, decryptWithECIES, encryptWithECIES} from "@/utils/encryption";
 
 
 
@@ -61,6 +61,15 @@ export function OfferDetailsPage() {
   const [isConfirming, setIsConfirming] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [buyerKeyPair, setBuyerKeyPair] = useState<{ privateKey: string, publicKey: string } | null>(null);
+
+  // Confirm modal state
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmCurrentStep, setConfirmCurrentStep] = useState(0);
+  const [isConfirmProcessing, setIsConfirmProcessing] = useState(false);
+  const [isConfirmConfirming, setIsConfirmConfirming] = useState(false);
+  const [isConfirmConfirmed, setIsConfirmConfirmed] = useState(false);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [decryptedPayload, setDecryptedPayload] = useState<string | null>(null);
 
   // Seller modal state
   const [showSellerModal, setShowSellerModal] = useState(false);
@@ -140,6 +149,173 @@ export function OfferDetailsPage() {
 
     // Show the seller modal
     setShowSellerModal(true);
+  };
+
+  // Handle confirm button click - opens the confirm modal
+  const handleConfirm = () => {
+    if (!product || !isConnected || !address) {
+      if (!isConnected) {
+        open(); // Open wallet connection dialog
+      }
+      return;
+    }
+
+    // Reset confirm modal state
+    setConfirmCurrentStep(0);
+    setBuyerKeyPair(null);
+    setIsConfirmProcessing(false);
+    setIsConfirmConfirming(false);
+    setIsConfirmConfirmed(false);
+    setConfirmError(null);
+    setDecryptedPayload(null);
+
+    // Show the confirm modal
+    setShowConfirmModal(true);
+  };
+
+  // Step 1 for confirm: Sign the seed, derive ECIES key pair, decrypt symmetric key, decrypt payload
+  const handleConfirmSignAndDecrypt = async () => {
+    if (!product || !isConnected || !product.encryptedSymKey) {
+      setConfirmError("Missing product data or encrypted symmetric key");
+      return;
+    }
+
+    setIsConfirmProcessing(true);
+    setConfirmError(null);
+    setConfirmCurrentStep(1);
+
+    try {
+      // Create message to sign using the product's fileId as the seed
+      const seedMessage = getEncryptionSeed(product.fileId);
+
+      // Sign message with wagmi
+      const signature = await signMessageAsync({
+        message: seedMessage,
+      });
+
+      if (!signature) {
+        throw new Error("Failed to sign message");
+      }
+
+      // Convert hex signature to base64
+      const signatureBytes = new Uint8Array(
+        signature.slice(2).match(/.{1,2}/g)!.map(byte => parseInt(byte, 16))
+      );
+      const signatureBase64 = b64FromBytes(signatureBytes);
+
+      // Generate key pair from signature
+      const keyPair = await generateKeyPairFromB64(signatureBase64);
+
+      // Store the key pair
+      setBuyerKeyPair(keyPair);
+
+      // Decrypt the symmetric key using the buyer's private key
+      const symmetricKey = await decryptWithECIES(keyPair.privateKey, product.encryptedSymKey);
+
+      // Fetch the encrypted product data from the CDN
+      const response = await fetch(`https://algoosh.b-cdn.net/payunlock/${product.fileId}.json`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch product data: ${response.status}`);
+      }
+
+      const productData = await response.json();
+      if (!productData.encryptedPayload) {
+        throw new Error("No encrypted payload found in product data");
+      }
+
+      // Decrypt the payload using the symmetric key
+      const decryptedContent = await decryptAES(symmetricKey, productData.encryptedPayload);
+
+      // Store the decrypted payload
+      setDecryptedPayload(decryptedContent);
+
+      // Move to next step
+      setConfirmCurrentStep(2);
+    } catch (err: any) {
+      console.error("Decryption error:", err);
+      setConfirmError(`Decryption failed: ${err.message}`);
+    } finally {
+      setIsConfirmProcessing(false);
+    }
+  };
+
+  // Step 2 for confirm: Call the smart contract method confirmCompleted with the order ID
+  const handleConfirmCompleted = async () => {
+    if (!product || !isConnected || !walletClient.data || !address || !publicClient) {
+      setConfirmError("Missing required data. Please complete Step 1 first.");
+      return;
+    }
+
+    setIsConfirmProcessing(true);
+    setIsConfirmConfirming(true);
+    setConfirmError(null);
+
+    try {
+      // Parse the product ID
+      const productId = parseInt(product.id);
+
+      console.log("Calling confirmCompleted with productId:", productId);
+
+      // Encode the function call
+      const data = encodeFunctionData({
+        abi: PayUnlockABI.abi,
+        functionName: 'confirmCompleted',
+        args: [productId],
+      });
+
+      // Simulate the transaction first to check for errors
+      try {
+        const result = await publicClient.simulateContract({
+          address: contractAddress as `0x${string}`,
+          abi: PayUnlockABI.abi,
+          functionName: 'confirmCompleted',
+          args: [productId],
+          account: address as `0x${string}`,
+        });
+        console.log(`✅ Simulation successful ${JSON.stringify(result, null, 2) || 'No result returned'}`);
+      } catch (simError: any) {
+        console.log(`❌ Simulation failed: ${simError.shortMessage || simError.message}`);
+        throw simError;
+      }
+
+      // Send the transaction
+      const hash = await walletClient.data.sendTransaction({
+        to: contractAddress as `0x${string}`,
+        data,
+      });
+
+      console.log(`Transaction sent: ${hash}`);
+
+      // Wait for the transaction to be confirmed
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+
+      if (receipt.status === 'success') {
+        setIsConfirmConfirmed(true);
+        console.log("Order confirmed successfully!");
+
+        // Wait a moment before closing the modal and refreshing
+        setTimeout(() => {
+          setShowConfirmModal(false);
+          window.location.reload();
+        }, 2000);
+      } else {
+        throw new Error('Transaction failed');
+      }
+
+    } catch (err: any) {
+      console.error("Confirmation error:", err);
+      // Provide more specific error messages based on the error type
+      if (err.name === 'ContractFunctionExecutionError') {
+        setConfirmError(`Smart contract error: ${err.shortMessage || err.message}`);
+      } else if (err.name === 'UserRejectedRequestError') {
+        setConfirmError("Transaction was rejected by user");
+      } else {
+        setConfirmError(`Confirmation failed: ${err.message}`);
+      }
+    } finally {
+      setIsConfirmProcessing(false);
+      setIsConfirmConfirming(false);
+    }
   };
 
   // Step 1 for seller: Sign the seed, derive ECIES key pair, decrypt symmetric key, encrypt with buyer's public key
@@ -471,7 +647,7 @@ export function OfferDetailsPage() {
         // Prepare buyer information if product is paid
         let buyerInfo: { buyer?: string; buyerPublicKey?: string; paidAt?: Date } = {};
         console.log("buyer:",buyer, "buyerPubKey:",buyerPubKey, "paidAt:",paidAt);
-        if (status === 1) { // Product is paid
+        if (status > 0) { // Product is paid
           buyerInfo = {
             buyer: buyer ? buyer : undefined,
             buyerPublicKey: buyerPubKey ? Buffer.from(buyerPubKey.slice(2), 'hex').toString() : undefined,
@@ -490,7 +666,7 @@ export function OfferDetailsPage() {
           status,
           currency,
           sellerPubKey: sellerPubKey ? Buffer.from(sellerPubKey.slice(2), 'hex').toString() : undefined,
-          encryptedSymKey: encryptedSymKey ? Buffer.from(encryptedSymKey.slice(2), 'hex').toString() : undefined,
+          encryptedSymKey: encryptedSymKey ? b64FromBytes(Buffer.from(encryptedSymKey.slice(2), 'hex')) : undefined,
           sendCodeWindow,
           confirmWindow,
           ...buyerInfo
@@ -573,6 +749,16 @@ export function OfferDetailsPage() {
                     >
                       <Key className="w-4 h-4" />
                       <span>Send Access Code</span>
+                    </button>
+                  )}
+                  {product.status === 2 && address && product.buyer && address.toLowerCase() === product.buyer.toLowerCase() && product.encryptedSymKey && (
+                    <button
+                      onClick={handleConfirm}
+                      disabled={isConfirmProcessing || !isConnected}
+                      className="w-full bg-green-600 text-white px-4 py-2 rounded-md font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 border border-green-500 shadow-sm mt-2"
+                    >
+                      <Key className="w-4 h-4" />
+                      <span>Confirm & View Content</span>
                     </button>
                   )}
                 </div>
@@ -858,6 +1044,92 @@ export function OfferDetailsPage() {
                         className="bg-primary text-primary-foreground px-6 py-2 rounded-md hover:bg-primary/90 transition-colors font-medium"
                         disabled={isSellerProcessing || isSellerConfirming}>
                   {isSellerConfirming ? "Processing..." : "Send Access Code"}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+            <h2 className="text-xl font-bold mb-4">Confirm & View Content</h2>
+
+            {confirmError && (
+              <div className="mb-4 p-3 bg-red-100 border border-red-300 text-red-700 rounded-md">
+                {confirmError}
+              </div>
+            )}
+
+            <div className={`mb-4 ${confirmCurrentStep === 1 ? 'bg-blue-50 p-3 border border-blue-200 rounded-md' : ''}`}>
+              <h3 className="font-semibold mb-2">Step 1: Decrypt Content</h3>
+              <p className="text-sm text-gray-600">
+                • Sign a message to verify your identity<br/>
+                • Derive your ECIES keypair<br/>
+                • Decrypt the symmetric key<br/>
+                • Decrypt the product content
+              </p>
+              {confirmCurrentStep === 1 && isConfirmProcessing && (
+                <div className="mt-2 text-blue-600 text-sm">Decrypting content...</div>
+              )}
+              {confirmCurrentStep > 1 && (
+                <div className="mt-2 text-green-600 text-sm">✓ Content decrypted</div>
+              )}
+            </div>
+
+            <div className={`mb-6 ${confirmCurrentStep === 2 ? 'bg-blue-50 p-3 border border-blue-200 rounded-md' : ''}`}>
+              <h3 className="font-semibold mb-2">Step 2: Confirm Receipt</h3>
+              <p className="text-sm text-gray-600">
+                • Confirm receipt of the product on the blockchain<br/>
+                • Complete the transaction<br/>
+                • Release payment to the seller
+              </p>
+              {confirmCurrentStep === 2 && isConfirmProcessing && (
+                <div className="mt-2 text-blue-600 text-sm">Confirming receipt...</div>
+              )}
+              {confirmCurrentStep === 2 && isConfirmConfirming && (
+                <div className="mt-2 text-blue-600 text-sm">Finalizing transaction...</div>
+              )}
+              {isConfirmConfirmed && (
+                <div className="mt-2 text-green-600 text-sm">✓ Receipt confirmed successfully!</div>
+              )}
+            </div>
+
+            {decryptedPayload && confirmCurrentStep > 1 && (
+              <div className="mb-6 bg-gray-50 p-4 border border-gray-200 rounded-md">
+                <h3 className="font-semibold mb-2">Product Content</h3>
+                <div className="bg-white p-3 border border-gray-300 rounded-md max-h-40 overflow-y-auto">
+                  <p className="whitespace-pre-wrap break-words">{decryptedPayload}</p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end mt-4">
+              <button onClick={() => setShowConfirmModal(false)}
+                      className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md mr-3 hover:bg-gray-300 transition-colors font-medium"
+                      disabled={isConfirmProcessing || isConfirmConfirming}>
+                {isConfirmProcessing ? "Please Wait..." : "Close"}
+              </button>
+              {confirmCurrentStep === 0 && (
+                <button onClick={handleConfirmSignAndDecrypt}
+                        className="bg-primary text-primary-foreground px-6 py-2 rounded-md hover:bg-primary/90 transition-colors font-medium"
+                        disabled={isConfirmProcessing || !isConnected}>
+                  Begin Process
+                </button>
+              )}
+              {confirmCurrentStep === 1 && (
+                <button disabled={true}
+                        className="bg-primary text-primary-foreground px-6 py-2 rounded-md opacity-50 cursor-not-allowed font-medium">
+                  Processing...
+                </button>
+              )}
+              {confirmCurrentStep === 2 && !isConfirmConfirmed && (
+                <button onClick={handleConfirmCompleted}
+                        className="bg-primary text-primary-foreground px-6 py-2 rounded-md hover:bg-primary/90 transition-colors font-medium"
+                        disabled={isConfirmProcessing || isConfirmConfirming}>
+                  {isConfirmConfirming ? "Processing..." : "Confirm Receipt"}
                 </button>
               )}
             </div>
