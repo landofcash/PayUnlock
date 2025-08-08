@@ -6,6 +6,14 @@ PayUnlock is a decentralized escrow marketplace for digital products, powered by
 
 PayUnlock is redefining digital commerce by removing intermediaries and guaranteeing secure delivery of digital products. Powered by advanced cryptography and Hedera smart contracts, it creates a trustless environment where buyers can verify content before payment is released. This DeFi-driven model brings practical, real-world use cases to blockchain, with security, transparency, and a seamless user experience at its core.
 
+## Project Structure
+
+- **Frontend** - React SPA is in payunlock-frontend folder
+- **Smart Contract** - Hedera Smart Contract is in payunlock-contract folder
+- **Sync Service** - Basic caching service is in payunlock-sync folder
+
+
+
 ## Tech Stack
 
 ### Frontend
@@ -63,6 +71,10 @@ PayUnlock is redefining digital commerce by removing intermediaries and guarante
 - Set prices in HBAR
 - Deliver encrypted content to buyers
 - Receive payment automatically once delivery is confirmed
+
+## Encryption Flow Diagram
+
+https://kroki.io/mermaid/svg/eNqdVd9v2jAQfuevsFJpohLVYjuEEG3VGD-mai_VumkPqA8uMSUiOJltRtG0_31OfKFxmnbdeIHv7nz33Xdns87yw2rDpEZfZz2k9nf3khUbpPDSu-FZxiXiYiWPhU5zgRYmGPVTkeqUZefebQ_BR5Cl94WJJN-hG86TpidYesomuknvBdN7yZvu4dKbT6_mN-gzP6KCpbLppKesExvRdIZ9Q_G423Et0xWaW5be7fljxKhfJ-_wTpbeNTtmOXPYmrYhlieowx81_UAK9a1SjiBjU_sTF1wyzR1S2H_Wg43nmzJKXYli77aCSTkPngyQW35ryjPJkdK5NKZUILUrh7nKhZZspZ3eaEdzKFWNwwyt08zOh4ukuQ-kvQ9onUt0tz8ai-lfJGiaJ9yRAAeWs2MbntZBda0DHtUj23bsA45OE53xp_PG49dOh_hLr2OliEnwsWqp2N9lZqu2rp_6L22UoLizfpXxvEtUWpezF8v8dll2CEjC-kzndSKjl-4TiZ7pr8UrqMNA5dOy9Kf5rsi4ac8hSslTovTUXOegadAket2--MMXB03DvwldB44650wj5-3oLDHufB8C_7kHopKwEhldXCCvnA46pHrzThXM3Ep9zPj7giVJKu4vMr7W8SXcp-_MfOl3b8u4S88cvjRlbKqgTDXjMv3J0VqaZ1Bv-KOcNnRoQ6lFIXpj3r3KNAGL9YcWYYuGFtlAMbIosmhsEenBc2UhBYgrOAFUEfReaPH_VHDFwNAiHr5CDgw9YWgKQ1d43MIRtOnD1KpWTnzhZTtUrCASlCRhm0aLAgEKBCgQKEmAAq1L-i6mNbZDUlZqZZVXdsAKxkIJxMJcKMyfwubQAHC9HmELwwZQ4EqBKwWuFOShY9hE3_ErW14FPVCTfPiF1IYVPEaaP-jfYKbd5uDRLPkKzEaQOI6vU8EBYgMnP_asARveqBXcPhy08NjFtJWOtOJJKz9t5adhE68yptSMr1HJ16y5zLf84pAmehPj4mFQWxJmupaSHWORC16b47MgnM-m0aD8883is9l8sVgYtMqzXMZndBTNRxO3TFn438uQYUBpWJcho3AYTE5lFtXHTre8pkYyCFwswpnvOx56ymmdg-cizd44rl7vD9h7zeg=
 
 ## Hedera Hackathon - DeFi Track
 

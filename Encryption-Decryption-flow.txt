@@ -1,0 +1,100 @@
+flowchart TD
+ subgraph s1["Seller encryption Flow (initial)"]
+        n2["Random Seed"]
+        n4["seller Signature"]
+        n5["ECIES Key pair"]
+        n3["Random AES Key"]
+        n6(["Symmetric Encrypt"])
+        n7(["ECIES Encrypt"])
+        A["Payload"]
+        n1["Encrypted Payload"]
+        n8["Encrypted AES Key (Seller)"]
+        n9(["Generate"])
+        n10(["Generate"])
+        n11(["User Input"])
+        n12["Seed, Encrypted AES key are stored in smart contract"]
+        n13["Encrypted Payload is stored in a file"]
+  end
+ subgraph s2["Seller encrypt for buyer (Send Code)"]
+        n14["Seed"]
+        n15["seller signature"]
+        n17["ECIES key pair"]
+        n18(["ECIES Decrypt"])
+        n19["Encrypted AES Key (Seller)"]
+        n20["AES Key"]
+        n29["Buyer public key"]
+        n30(["ECIES Encrypt"])
+        n31["Encrypted AES Key (Buyer)"]
+  end
+ subgraph s3["Buyer Flow (Buy)"]
+        n24["Seed"]
+        n26["Buyer Signature"]
+        n27["ECIES Key pair"]
+        n28["Buyer public key"]
+  end
+ subgraph s4["Buyer Decrypt Payload (Completed)"]
+        n32["Seed"]
+        n33["Buyer signature"]
+        n34["ECIES Key Pair"]
+        n35(["ECIES Decrypt"])
+        n36["Encrypted AES Key (Buyer)"]
+        n37["AES Key"]
+        n38(["Symmetric Decrypt"])
+        n39["Payload"]
+        n40["Encrypted Payload"]
+  end
+    n2 -- "Sign with<span style=padding-left:>Seller Wallet</span>" --> n4
+    n4 -- Derive from the signature --> n5
+    n3 --> n6 & n7
+    A --> n6
+    n6 --> n1
+    n5 --> n7
+    n7 --> n8
+    n9 --> n2
+    n10 --> n3
+    n11 --> A
+    n14 -- "<span style=padding-left:>Sign with<span style=padding-left:>Seller Wallet</span></span>" --> n15
+    n15 -- Derive from the signature --> n17
+    n17 --> n18
+    n19 --> n18
+    n18 --> n20
+    n24 -- Sign with buyer wallet --> n26
+    n26 -- Derive from signature --> n27
+    n27 --> n28
+    n29 --> n30
+    n20 --> n30
+    n30 --> n31
+    s1 --> s3
+    s3 --> s2
+    n32 --> n33
+    n33 --> n34
+    n34 --> n35
+    n36 --> n35
+    n35 --> n37
+    n37 --> n38
+    n38 --> n39
+    n40 --> n38
+    s2 --> s4
+
+    n12@{ shape: text}
+    n13@{ shape: text}
+    n14@{ shape: rect}
+     n2:::Pine
+     n1:::Aqua
+     n1:::Pine
+     n8:::Pine
+     n12:::Pine
+     n14:::Pine
+     n19:::Pine
+     n31:::Pine
+     n24:::Pine
+     n28:::Pine
+     n32:::Pine
+     n36:::Pine
+    classDef Aqua stroke-width:1px, stroke-dasharray:none, stroke:#46EDC8, fill:#DEFFF8, color:#378E7A
+    classDef Pine stroke-width:1px, stroke-dasharray:none, stroke:#254336, fill:#27654A, color:#FFFFFF
+    style n1 fill:#FF6D00
+    style n13 stroke:#FF6D00,fill:#FF6D00
+    style n40 fill:#FF6D00
+
+
