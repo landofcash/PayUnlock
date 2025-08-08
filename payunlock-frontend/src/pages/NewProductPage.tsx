@@ -1,7 +1,7 @@
 import {Layout} from "../components/Layout";
 import {useState, useRef, useEffect} from "react";
 import {getCurrentConfig} from "@/config";
-import {b64FromBytes} from "@/utils/encoding";
+import {b64FromBytes, b64ToBytes} from "@/utils/encoding";
 import {generateKeyPairFromB64, getEncryptionSeed} from "@/utils/keygen";
 import {generateAESKey, encryptWithECIES, encryptAES} from "@/utils/encryption";
 import {encodeBase64Uuid} from "@/utils/uuidBase64.ts";
@@ -14,6 +14,7 @@ import {
 import {useAppKit} from "@reown/appkit/react";
 import {encodeFunctionData, parseUnits, toHex} from "viem";
 import PayUnlockABI from "@/contracts/PayUnlock.sol/PayUnlock.json";
+import { Wallet } from 'lucide-react';
 
 
 // Interface for product form data
@@ -206,6 +207,8 @@ export function NewProductPage() {
       const decimals = encryptedData.tokenId === "0.0.0" ? 8 : 18;
       const priceInWei = parseUnits(encryptedData.price, decimals);
 
+      const encryptedKeyHex = toHex(b64ToBytes(encryptedData.encryptedKey));
+
       const data = encodeFunctionData({
         abi: PayUnlockABI.abi,
         functionName: 'createProduct',
@@ -214,7 +217,7 @@ export function NewProductPage() {
           priceInWei,
           currency,
           toHex(encryptedData.publicKey),
-          toHex(encryptedData.encryptedKey),
+          encryptedKeyHex,
           ],
       });
 
@@ -291,10 +294,30 @@ export function NewProductPage() {
     <Layout>
       <div className="max-w-3xl mx-auto">
         <h1 className="text-3xl font-bold mb-6">Sell Your Digital Product</h1>
-        <p className="mb-8">Create a secure listing for your digital content with blockchain protection</p>
+        <p className="mb-4">Create a secure listing for your digital content with blockchain protection</p>
+
+        {!isConnected && (
+          <div className="flex justify-center mb-8">
+            <div className="inline-block">
+              <button
+                onClick={() => open()}
+                className="flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors text-lg font-medium"
+              >
+                <Wallet className="h-5 w-5" />
+                <span>Connect Wallet</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="bg-card rounded-lg shadow-md p-6">
-          <form className="space-y-6" onSubmit={handleSubmit}>
+          {!isConnected && (
+            <div className="mb-4 text-primary font-medium text-center">
+              Please connect your wallet to create a product listing
+            </div>
+          )}
+
+          <form className={`space-y-6 ${!isConnected ? "opacity-60 pointer-events-none" : ""}`} onSubmit={handleSubmit} aria-disabled={!isConnected}>
             <div>
               <label htmlFor="name" className="block mb-2 font-medium">
                 Product Name

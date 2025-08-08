@@ -60,17 +60,17 @@ export async function decryptAES(key: CryptoKey, encrypted: string): Promise<str
 
 /**
  * Encrypts an AES key using ECIES with secp256k1.
- * @param {string} publicKeyHex - Receiver's public key (Base64)
+ * @param {string} publicKeyB64 - Receiver's public key (Base64)
  * @param {CryptoKey} aesKey - AES key to encrypt
  * @returns {Promise<string>} Encrypted AES key (Base64)
  */
-export async function encryptWithECIES(publicKeyHex: string, aesKey: CryptoKey): Promise<string> {
+export async function encryptWithECIES(publicKeyB64: string, aesKey: CryptoKey): Promise<string> {
     // Export the AES key as raw bytes
     const exportedKey = await crypto.subtle.exportKey("raw", aesKey);
     const aesKeyBytes = new Uint8Array(exportedKey);
 
     // Convert public key hex to Buffer
-    const publicKeyBuffer = b64ToBytes(publicKeyHex);
+    const publicKeyBuffer = b64ToBytes(publicKeyB64);
 
     // Encrypt the AES key with ECIES (secp256k1)
     const encryptedAESKey = ecies.encrypt(publicKeyBuffer, aesKeyBytes);

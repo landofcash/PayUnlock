@@ -23,15 +23,13 @@ export function MyOffersPage() {
 
   useEffect(() => {
     const fetchProducts = async () => {
-      if (!publicClient || !address) return;
-
       try {
         setIsLoading(true);
-        const loadedProducts = await loadProducts(publicClient, contractAddress);
+        const loadedProducts = await loadProducts(publicClient!, contractAddress);
 
         // Filter products where the seller address matches the current user's address
         const myOffers = loadedProducts.filter(product => {
-          return product.seller.toLowerCase() === address.toLowerCase();
+          return product.seller.toLowerCase() === address!.toLowerCase();
         });
 
         setProducts(myOffers);
@@ -43,7 +41,12 @@ export function MyOffersPage() {
       }
     };
 
-    fetchProducts();
+    // Only call fetchProducts when wallet is connected
+    if (publicClient && address) {
+      fetchProducts();
+    } else {
+      setIsLoading(false); // Set loading to false if wallet is not connected
+    }
   }, [publicClient, contractAddress, address]);
 
   return (

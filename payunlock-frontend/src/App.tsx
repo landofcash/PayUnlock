@@ -9,6 +9,7 @@ import { MyOffersPage } from './pages/MyOffersPage'
 import { MyPurchasesPage } from './pages/MyPurchasesPage'
 import {WalletSignDebugPage} from "@/pages/Debug/WalletSignDebugPage.tsx";
 import TestAppKitPage from './pages/Debug/TestAppKitPage'
+import {DecryptDebugPage} from "@/pages/Debug/DecryptDebugPage.tsx";
 
 function App() {
   return (
@@ -30,6 +31,7 @@ function App() {
 
         <Route path="/debug/wallet-sign" element={<WalletSignDebugPage />} />
         <Route path="/debug/test-contract" element={<TestAppKitPage />} />
+        <Route path="/debug/decrypt" element={<DecryptDebugPage />} />
 
 
         {/* Fallback for unknown routes */}

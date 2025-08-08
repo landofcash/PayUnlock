@@ -85,6 +85,12 @@ export function Layout({ children }: LayoutProps) {
                       >
                         Contract Debug
                       </Link>
+                      <Link
+                      to="/debug/decrypt"
+                      className="text-sm hover:underline p-2 hover:bg-accent rounded-sm transition-colors"
+                      >
+                      Decrypt Debug
+                    </Link>
                     </div>
                   </div>
                 </PopoverContent>

@@ -23,15 +23,13 @@ export function MyPurchasesPage() {
 
   useEffect(() => {
     const fetchProducts = async () => {
-      if (!publicClient || !address) return;
-
       try {
         setIsLoading(true);
         // Wait for all product details to be fetched
-        const loadedProducts = await loadProducts(publicClient, contractAddress);
+        const loadedProducts = await loadProducts(publicClient!, contractAddress);
 
         const myPurchases = loadedProducts.filter(product => {
-          return product.buyer.toLowerCase() === address.toLowerCase();
+          return product.buyer.toLowerCase() === address!.toLowerCase();
         });
         setProducts(myPurchases);
       } catch (err: any) {
@@ -42,7 +40,12 @@ export function MyPurchasesPage() {
       }
     };
 
-    fetchProducts();
+    // Only call fetchProducts when wallet is connected
+    if (publicClient && address) {
+      fetchProducts();
+    } else {
+      setIsLoading(false); // Set loading to false if wallet is not connected
+    }
   }, [publicClient, contractAddress, address]);
 
   return (
