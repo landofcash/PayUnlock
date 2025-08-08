@@ -5,7 +5,7 @@ import {encodeFunctionData, toHex} from 'viem'
 import PayUnlockABI from '@/contracts/PayUnlock.sol/PayUnlock.json';
 import {Layout} from "@/components/Layout.tsx";
 
-const CONTRACT_ADDRESS = '0x953aFC7f6d3201D7D76BB146542E144b31504Ac5';
+const CONTRACT_ADDRESS = '0xd1927B79FD55A0F89E2e9524033c0206D2a721d0';
 const EXPECTED_CHAIN_ID = 296;
 
 export default function CreateProductDebug() {

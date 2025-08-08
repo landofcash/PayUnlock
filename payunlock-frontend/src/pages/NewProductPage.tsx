@@ -145,8 +145,7 @@ export function NewProductPage() {
       const keyPair = await generateKeyPairFromB64(signatureBase64);
       const encryptedKey = await encryptWithECIES(keyPair.publicKey, aesKey);
 
-      // Store encrypted data
-      setEncryptedData({
+      const data = {
         seed: seed.current,
         name: formData.name,
         description: formData.description,
@@ -155,7 +154,20 @@ export function NewProductPage() {
         encryptedPayload: encryptedPayload,
         encryptedKey: encryptedKey,
         publicKey: keyPair.publicKey
+      }
+      // Store encrypted data
+      setEncryptedData(data);
+
+
+      const res = await fetch(`${config.fileApiUrl}/json`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          path: `${seed.current}.json`,
+          content: data,
+        }),
       });
+      if (!res.ok) throw new Error('JSON upload failed');
 
       setCurrentStep(2);
     } catch (err: any) {
@@ -285,33 +297,35 @@ export function NewProductPage() {
   return (
     <Layout>
       <div className="max-w-3xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6">Create New Product</h1>
-        <p className="mb-8">List your digital product securely with blockchain protection</p>
+        <h1 className="text-3xl font-bold mb-6">Sell Your Digital Product</h1>
+        <p className="mb-8">Create a secure listing for your digital content with blockchain protection</p>
 
         <div className="bg-card rounded-lg shadow-md p-6">
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
-              <label htmlFor="name" className="block mb-2">
+              <label htmlFor="name" className="block mb-2 font-medium">
                 Product Name
               </label>
               <input type="text" id="name" ref={nameRef} className="w-full p-2 border border-input rounded-md"
-                     placeholder="e.g., Windows 11 Pro License" onChange={handleInputChange} required/>
+                     placeholder="e.g., Premium E-book, Software License, Digital Art" onChange={handleInputChange} required/>
+              <p className="text-xs text-gray-500 mt-1">Choose a clear, descriptive name that helps buyers understand what you're selling</p>
             </div>
 
             <div>
-              <label htmlFor="description" className="block mb-2">
-                Description
+              <label htmlFor="description" className="block mb-2 font-medium">
+                Product Description
               </label>
               <textarea id="description" ref={descriptionRef} rows={4}
                         className="w-full p-2 border border-input rounded-md"
-                        placeholder="Provide detailed information about your digital product..."
+                        placeholder="Describe what buyers will receive, key features, and any important details..."
                         onChange={handleInputChange} required></textarea>
+              <p className="text-xs text-gray-500 mt-1">A detailed description helps buyers make informed decisions</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label htmlFor="token" className="block mb-2">
-                  Token
+                <label htmlFor="token" className="block mb-2 font-medium">
+                  Payment Currency
                 </label>
                 <select id="token" ref={tokenRef} className="w-full p-2 border border-input rounded-md"
                         onChange={handleInputChange} required>
@@ -320,30 +334,34 @@ export function NewProductPage() {
                       {token.name} ({token.symbol}) </option>
                   ))}
                 </select>
+                <p className="text-xs text-gray-500 mt-1">Select which currency buyers will use to purchase</p>
               </div>
 
               <div>
-                <label htmlFor="price" className="block mb-2">
+                <label htmlFor="price" className="block mb-2 font-medium">
                   Price
                 </label>
                 <input type="number" id="price" ref={priceRef} className="w-full p-2 border border-input rounded-md"
                        placeholder="0.00" min="0" step="0.01" onChange={handleInputChange} required/>
+                <p className="text-xs text-gray-500 mt-1">Set a competitive price in the selected currency</p>
               </div>
             </div>
 
             <div>
-              <label htmlFor="payload" className="block mb-2">
-                Payload
+              <label htmlFor="payload" className="block mb-2 font-medium">
+                Product Content
               </label>
               <textarea id="payload" ref={payloadRef} rows={4} className="w-full p-2 border border-input rounded-md"
-                        placeholder="Enter the payload content that will be encrypted..." onChange={handleInputChange}
+                        placeholder="Enter the actual content buyers will receive (license key, download link, access code, etc.)"
+                        onChange={handleInputChange}
                         required></textarea>
+              <p className="text-xs text-gray-500 mt-1">This content will be securely encrypted and only revealed to buyers after purchase</p>
             </div>
 
             <div className="pt-4">
               <button type="submit"
-                      className="w-full bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors">
-                {!isConnected ? "Connect Wallet" : "Create Product"}
+                      className="w-full bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors text-lg font-medium">
+                {!isConnected ? "Connect Wallet to Continue" : "List Product for Sale"}
               </button>
             </div>
           </form>
@@ -353,7 +371,7 @@ export function NewProductPage() {
         {showModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
-              <h2 className="text-xl font-bold mb-4">Next Steps</h2>
+              <h2 className="text-xl font-bold mb-4">Create Your Product</h2>
 
               {error && (
                 <div className="mb-4 p-3 bg-red-100 border border-red-300 text-red-700 rounded-md">
@@ -362,59 +380,58 @@ export function NewProductPage() {
               )}
 
               <div className={`mb-4 ${currentStep === 1 ? 'bg-blue-50 p-3 border border-blue-200 rounded-md' : ''}`}>
-                <h3 className="font-semibold mb-2">Step 1: Encryption</h3>
+                <h3 className="font-semibold mb-2">Step 1: Securing Your Content</h3>
                 <p className="text-sm text-gray-600">
-                  • Sign the product seed with your wallet<br/>
-                  • Create ECIES key pair derived from the signature<br/>
-                  • Create new AES key<br/>
-                  • Encrypt payload with AES<br/>
-                  • Encrypt key with ECIES </p>
+                  • Verify your ownership with a digital signature<br/>
+                  • Generate secure keys to protect your content<br/>
+                  • Encrypt your product data for customer safety<br/>
+                  • Prepare your content for secure distribution</p>
                 {currentStep === 1 && isProcessing && (
-                  <div className="mt-2 text-blue-600 text-sm">Processing...</div>
+                  <div className="mt-2 text-blue-600 text-sm">Securing your content...</div>
                 )}
                 {currentStep > 1 && (
-                  <div className="mt-2 text-green-600 text-sm">✓ Completed</div>
+                  <div className="mt-2 text-green-600 text-sm">✓ Content secured</div>
                 )}
               </div>
 
               <div className={`mb-6 ${currentStep === 2 ? 'bg-blue-50 p-3 border border-blue-200 rounded-md' : ''}`}>
-                <h3 className="font-semibold mb-2">Step 2: Blockchain Storage</h3>
+                <h3 className="font-semibold mb-2">Step 2: Publishing Your Product</h3>
                 <p className="text-sm text-gray-600">
-                  • Call smart contract to store the product data on chain<br/>
-                  • Product metadata will be stored in Hedera file as JSON </p>
+                  • Register your product on the blockchain network<br/>
+                  • Store product details securely for buyers to discover</p>
                 {currentStep === 2 && isProcessing && (
-                  <div className="mt-2 text-blue-600 text-sm">Processing...</div>
+                  <div className="mt-2 text-blue-600 text-sm">Publishing your product...</div>
                 )}
                 {currentStep === 2 && isConfirming && (
-                  <div className="mt-2 text-blue-600 text-sm">Waiting for transaction confirmation...</div>
+                  <div className="mt-2 text-blue-600 text-sm">Finalizing your product listing...</div>
                 )}
                 {isConfirmed && (
-                  <div className="mt-2 text-green-600 text-sm">✓ Transaction confirmed!</div>
+                  <div className="mt-2 text-green-600 text-sm">✓ Product successfully published!</div>
                 )}
               </div>
 
-              <div className="flex justify-end">
+              <div className="flex justify-end mt-4">
                 <button onClick={() => setShowModal(false)}
-                        className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md mr-2 hover:bg-gray-300 transition-colors"
+                        className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md mr-3 hover:bg-gray-300 transition-colors font-medium"
                         disabled={isProcessing || isConfirming}>
-                  Cancel
+                  {isProcessing ? "Please Wait..." : "Cancel"}
                 </button>
                 {currentStep === 0 && (
                   <button onClick={handleEncryption}
-                          className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
+                          className="bg-primary text-primary-foreground px-6 py-2 rounded-md hover:bg-primary/90 transition-colors font-medium"
                           disabled={isProcessing || !isConnected}>
-                    Start Process </button>
+                    Begin Listing </button>
                 )}
                 {currentStep === 1 && (
                   <button disabled={true}
-                          className="bg-primary text-primary-foreground px-4 py-2 rounded-md opacity-50 cursor-not-allowed">
-                    Proceed </button>
+                          className="bg-primary text-primary-foreground px-6 py-2 rounded-md opacity-50 cursor-not-allowed font-medium">
+                    Processing... </button>
                 )}
                 {currentStep === 2 && !isConfirmed && (
                   <button onClick={handleBlockchainStorage}
-                          className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
+                          className="bg-primary text-primary-foreground px-6 py-2 rounded-md hover:bg-primary/90 transition-colors font-medium"
                           disabled={isProcessing || isConfirming}>
-                    {isConfirming ? "Confirming..." : "Store on Blockchain"}
+                    {isConfirming ? "Publishing..." : "Publish Product"}
                   </button>
                 )}
               </div>

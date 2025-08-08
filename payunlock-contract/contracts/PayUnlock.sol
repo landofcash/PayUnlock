@@ -13,6 +13,7 @@ contract PayUnlock {
 
   struct Product {
     // commercial terms
+    //string seed;
     address seller;
     uint256 price;          // tinybars or token decimals
     address currency;       // address(0) = HBAR
@@ -96,8 +97,14 @@ contract PayUnlock {
     require(p.status == Status.Initial, "not purchasable");
     require(p.currency == address(0), "not HBAR");
     require(expectedPrice == p.price, "price changed");
-    require(msg.value == p.price, "wrong amount");
-    require(p.buyer == address(0), "already bought");
+    require(msg.value == p.price, string(abi.encodePacked(
+      "wrong amount: sent ",
+      uintToString(msg.value),
+      ", expected ",
+      uintToString(p.price)
+    )));
+
+  require(p.buyer == address(0), "already bought");
     require(buyerPubKey.length > 0, "buyer key required");
 
     p.status = Status.Paid;
@@ -215,4 +222,24 @@ contract PayUnlock {
     emit StatusChanged(id, prev, Status.Refunded);
     emit Refunded(id, p.buyer, p.price, p.currency);
   }
+  //todo replace with @openzeppelin/contracts/utils/Strings.sol";
+  function uintToString(uint256 value) internal pure returns (string memory) {
+    if (value == 0) {
+      return "0";
+    }
+    uint256 temp = value;
+    uint256 digits;
+    while (temp != 0) {
+      digits++;
+      temp /= 10;
+    }
+    bytes memory buffer = new bytes(digits);
+    while (value != 0) {
+      digits -= 1;
+      buffer[digits] = bytes1(uint8(48 + uint256(value % 10)));
+      value /= 10;
+    }
+    return string(buffer);
+  }
+
 }
