@@ -1,118 +1,140 @@
 import { Link } from "react-router-dom";
 import { Layout } from "../components/Layout";
+import { ProductStatusBadge } from "../components/ProductStatusBadge";
+import { useState, useEffect } from "react";
+import { usePublicClient, useAccount } from "wagmi";
+import { getCurrentConfig } from "@/config";
+import { loadProducts, type Product } from "@/utils/productUtils";
 
 export function MyPurchasesPage() {
-  // This would typically fetch data from an API
-  const mockPurchases = [
-    {
-      id: "201",
-      title: "Windows 11 Pro License",
-      price: "120",
-      seller: "TechKeys",
-      status: "delivered",
-      purchaseDate: "2025-07-25"
-    },
-    {
-      id: "202",
-      title: "Adobe Creative Cloud 1-Year",
-      price: "240",
-      seller: "SoftwarePlus",
-      status: "pending",
-      purchaseDate: "2025-08-01"
-    },
-    {
-      id: "203",
-      title: "Game Key - Latest RPG",
-      price: "59",
-      seller: "GameDeals",
-      status: "disputed",
-      purchaseDate: "2025-08-03"
-    },
-  ];
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Status badge color mapping
-  const getStatusBadgeClass = (status: string) => {
-    switch (status) {
-      case 'delivered':
-        return 'bg-green-100 text-green-800';
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'disputed':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-blue-100 text-blue-800';
-    }
+  const publicClient = usePublicClient();
+  const { address } = useAccount();
+  const config = getCurrentConfig();
+  const contractAddress = config.contracts.payUnlock.address;
+
+  // Format address to show only first 6 and last 4 characters
+  const formatAddress = (addr: string) => {
+    return `${addr.substring(0, 6)}...${addr.substring(addr.length - 4)}`;
   };
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      if (!publicClient || !address) return;
+
+      try {
+        setIsLoading(true);
+        const loadedProducts = await loadProducts(publicClient, contractAddress);
+
+        // We need to get the full product details to check the buyer
+        // First, get all products
+        const productDetailsPromises = loadedProducts.map(async (product) => {
+          try {
+            // Fetch the product from blockchain to get buyer information
+            const productData = await publicClient.readContract({
+              address: contractAddress as `0x${string}`,
+              abi: (await import("@/contracts/PayUnlock.sol/PayUnlock.json")).default.abi,
+              functionName: 'products',
+              args: [parseInt(product.id)],
+            }) as any;
+
+            // Extract buyer address from product data
+            const [, , , , , buyer] = productData;
+
+            // Return product with buyer information
+            return {
+              ...product,
+              fullBuyer: buyer
+            };
+          } catch (err) {
+            console.error(`Error fetching details for product ${product.id}:`, err);
+            return null;
+          }
+        });
+
+        // Wait for all product details to be fetched
+        const productsWithDetails = (await Promise.all(productDetailsPromises)).filter(Boolean);
+
+        // Filter products where the buyer address matches the current user's address
+        const myPurchases = productsWithDetails.filter(product => {
+          if (!product?.fullBuyer) return false;
+
+          // Compare addresses in lowercase to ensure case-insensitive matching
+          return product.fullBuyer.toLowerCase() === address.toLowerCase();
+        });
+
+        setProducts(myPurchases);
+      } catch (err: any) {
+        console.error("Error fetching products:", err);
+        setError(err.message || "Failed to fetch products");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, [publicClient, contractAddress, address]);
 
   return (
     <Layout>
       <div>
         <h1 className="text-3xl font-bold mb-6">My Purchases</h1>
-        <p className="mb-8">View and manage your purchased digital products</p>
+        <p className="mb-8">Products you have purchased</p>
 
-        <div className="bg-card rounded-lg shadow-md overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-muted">
-              <tr>
-                <th className="text-left p-4">Product</th>
-                <th className="text-left p-4">Price</th>
-                <th className="text-left p-4">Seller</th>
-                <th className="text-left p-4">Status</th>
-                <th className="text-left p-4">Purchase Date</th>
-                <th className="text-left p-4">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {mockPurchases.map((purchase) => (
-                <tr key={purchase.id}>
-                  <td className="p-4">
-                    <Link to={`/purchase/${purchase.id}`} className="text-primary hover:underline">
-                      {purchase.title}
-                    </Link>
-                  </td>
-                  <td className="p-4">${purchase.price}</td>
-                  <td className="p-4">{purchase.seller}</td>
-                  <td className="p-4">
-                    <span className={`inline-block px-2 py-1 rounded-full text-xs ${getStatusBadgeClass(purchase.status)}`}>
-                      {purchase.status.charAt(0).toUpperCase() + purchase.status.slice(1)}
-                    </span>
-                  </td>
-                  <td className="p-4">{purchase.purchaseDate}</td>
-                  <td className="p-4">
-                    <div className="flex space-x-2">
-                      <Link
-                        to={`/purchase/${purchase.id}`}
-                        className="text-sm bg-secondary text-secondary-foreground px-2 py-1 rounded hover:bg-secondary/90 transition-colors"
-                      >
-                        View
-                      </Link>
-                      {purchase.status === 'pending' && (
-                        <Link
-                          to={`/dispute/${purchase.id}`}
-                          className="text-sm bg-destructive text-white px-2 py-1 rounded hover:bg-destructive/90 transition-colors"
-                        >
-                          Dispute
-                        </Link>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {isLoading && (
+          <div className="text-center py-10">
+            <p>Loading your purchases...</p>
+          </div>
+        )}
 
-        {mockPurchases.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground mb-4">You haven't made any purchases yet</p>
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+            <p>{error}</p>
+          </div>
+        )}
+
+        {!isLoading && !address && !error && (
+          <div className="text-center py-10">
+            <p>Please connect your wallet to view your purchases.</p>
+          </div>
+        )}
+
+        {!isLoading && address && products.length === 0 && !error && (
+          <div className="text-center py-10">
+            <p>You haven't purchased any products yet.</p>
             <Link
               to="/offers"
-              className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
+              className="inline-block mt-4 bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
             >
-              Browse Available Offers
+              Browse available products
             </Link>
           </div>
         )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {products.map((product) => (
+            <div key={product.id} className="bg-card rounded-lg shadow-md overflow-hidden">
+              <div className="p-6">
+                <div className="flex justify-between items-start mb-2">
+                  <h2 className="text-xl font-semibold">{product.name}</h2>
+                  <ProductStatusBadge status={product.status} />
+                </div>
+                <p className="text-sm text-muted-foreground mb-4">{product.description}</p>
+                <p className="text-muted-foreground mb-2">Seller: {formatAddress(product.seller)}</p>
+                <p className="text-2xl mb-4">Price: {product.price} hBar</p>
+                <Link
+                  to={`/offer/${product.id}`}
+                  className="block w-full text-center bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
+                >
+                  View Details
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </Layout>
   );

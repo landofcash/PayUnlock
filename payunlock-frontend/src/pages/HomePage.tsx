@@ -6,10 +6,12 @@ export function HomePage() {
     <Layout>
       <div className="max-w-4xl mx-auto text-center">
         <h1 className="text-4xl font-bold mb-6">Welcome to PayUnlock</h1>
-        <p className="text-xl mb-8">
-          A decentralized escrow marketplace for digital products, powered by Hedera Smart Contracts.
+        <p className="text-xl">
+          MVP of a decentralized escrow marketplace for digital products, powered by Hedera.
         </p>
-
+        <p className="text-xl mb-8">
+          DEFI approach, real-world use cases, and a focus on security.
+        </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-12">
           <div className="bg-card p-6 rounded-lg shadow-md">
             <h2 className="text-2xl font-semibold mb-4">For Buyers</h2>

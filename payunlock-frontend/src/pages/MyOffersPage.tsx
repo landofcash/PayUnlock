@@ -1,112 +1,109 @@
 import { Link } from "react-router-dom";
 import { Layout } from "../components/Layout";
+import { ProductStatusBadge } from "../components/ProductStatusBadge";
+import { useState, useEffect } from "react";
+import { usePublicClient, useAccount } from "wagmi";
+import { getCurrentConfig } from "@/config";
+import { loadProducts, type Product } from "@/utils/productUtils";
 
 export function MyOffersPage() {
-  // This would typically fetch data from an API
-  const mockMyOffers = [
-    {
-      id: "101",
-      title: "Windows 11 Pro License",
-      price: "120",
-      status: "active",
-      sales: 5,
-      created: "2025-07-15"
-    },
-    {
-      id: "102",
-      title: "Photoshop 2025 License",
-      price: "199",
-      status: "active",
-      sales: 3,
-      created: "2025-07-20"
-    },
-    {
-      id: "103",
-      title: "Game Key - Strategy Game",
-      price: "45",
-      status: "sold",
-      sales: 1,
-      created: "2025-08-01"
-    },
-  ];
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const publicClient = usePublicClient();
+  const { address } = useAccount();
+  const config = getCurrentConfig();
+  const contractAddress = config.contracts.payUnlock.address;
+
+  // Format address to show only first 6 and last 4 characters
+  const formatAddress = (addr: string) => {
+    return `${addr.substring(0, 6)}...${addr.substring(addr.length - 4)}`;
+  };
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      if (!publicClient || !address) return;
+
+      try {
+        setIsLoading(true);
+        const loadedProducts = await loadProducts(publicClient, contractAddress);
+
+        // Filter products where the seller address matches the current user's address
+        // Compare full addresses directly (case-insensitive)
+        const myOffers = loadedProducts.filter(product => {
+          return product.seller.toLowerCase() === address.toLowerCase();
+        });
+
+        setProducts(myOffers);
+      } catch (err: any) {
+        console.error("Error fetching products:", err);
+        setError(err.message || "Failed to fetch products");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, [publicClient, contractAddress, address]);
 
   return (
     <Layout>
       <div>
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">My Offers</h1>
-          <Link
-            to="/create"
-            className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
-          >
-            Create New Offer
-          </Link>
-        </div>
+        <h1 className="text-3xl font-bold mb-6">My Products</h1>
+        <p className="mb-8">Products you have listed for sale</p>
 
-        <div className="bg-card rounded-lg shadow-md overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-muted">
-              <tr>
-                <th className="text-left p-4">Title</th>
-                <th className="text-left p-4">Price</th>
-                <th className="text-left p-4">Status</th>
-                <th className="text-left p-4">Sales</th>
-                <th className="text-left p-4">Created</th>
-                <th className="text-left p-4">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {mockMyOffers.map((offer) => (
-                <tr key={offer.id}>
-                  <td className="p-4">
-                    <Link to={`/offer/${offer.id}`} className="text-primary hover:underline">
-                      {offer.title}
-                    </Link>
-                  </td>
-                  <td className="p-4">${offer.price}</td>
-                  <td className="p-4">
-                    <span className={`inline-block px-2 py-1 rounded-full text-xs ${
-                      offer.status === 'active' 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-blue-100 text-blue-800'
-                    }`}>
-                      {offer.status.charAt(0).toUpperCase() + offer.status.slice(1)}
-                    </span>
-                  </td>
-                  <td className="p-4">{offer.sales}</td>
-                  <td className="p-4">{offer.created}</td>
-                  <td className="p-4">
-                    <div className="flex space-x-2">
-                      <Link
-                        to={`/send-key/${offer.id}`}
-                        className="text-sm bg-secondary text-secondary-foreground px-2 py-1 rounded hover:bg-secondary/90 transition-colors"
-                      >
-                        Send Key
-                      </Link>
-                      <button
-                        className="text-sm bg-muted text-muted-foreground px-2 py-1 rounded hover:bg-muted/90 transition-colors"
-                      >
-                        Edit
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {isLoading && (
+          <div className="text-center py-10">
+            <p>Loading your products...</p>
+          </div>
+        )}
 
-        {mockMyOffers.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground mb-4">You haven't created any offers yet</p>
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+            <p>{error}</p>
+          </div>
+        )}
+
+        {!isLoading && !address && !error && (
+          <div className="text-center py-10">
+            <p>Please connect your wallet to view your products.</p>
+          </div>
+        )}
+
+        {!isLoading && address && products.length === 0 && !error && (
+          <div className="text-center py-10">
+            <p>You haven't listed any products yet.</p>
             <Link
               to="/create"
-              className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
+              className="inline-block mt-4 bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
             >
-              Create Your First Offer
+              Create a new product
             </Link>
           </div>
         )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {products.map((product) => (
+            <div key={product.id} className="bg-card rounded-lg shadow-md overflow-hidden">
+              <div className="p-6">
+                <div className="flex justify-between items-start mb-2">
+                  <h2 className="text-xl font-semibold">{product.name}</h2>
+                  <ProductStatusBadge status={product.status} />
+                </div>
+                <p className="text-sm text-muted-foreground mb-4">{product.description}</p>
+                <p className="text-muted-foreground mb-2">Seller: {formatAddress(product.seller)}</p>
+                <p className="text-2xl mb-4">Price: {product.price} hBar</p>
+                <Link
+                  to={`/offer/${product.id}`}
+                  className="block w-full text-center bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
+                >
+                  View Details
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </Layout>
   );
