@@ -61,7 +61,7 @@ const configs: Record<'testnet' | 'mainnet', NetworkConfig> = {
     },
     contracts: {
       payUnlock: {
-        address: '0x79Fe6074C4e253E59f39C8aaAd206b254B33a0cF',
+        address: '0xa57cc818511B8BDe480fD18A8f61360BB77D2035',
         deploymentBlock: 0
       }
     }
@@ -90,7 +90,7 @@ const configs: Record<'testnet' | 'mainnet', NetworkConfig> = {
     },
     contracts: {
       payUnlock: {
-        address: '0x79Fe6074C4e253E59f39C8aaAd206b254B33a0cF',
+        address: '0xa57cc818511B8BDe480fD18A8f61360BB77D2035',
         deploymentBlock: 0
       }
     }
