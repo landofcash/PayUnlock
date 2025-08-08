@@ -27,45 +27,12 @@ export function MyPurchasesPage() {
 
       try {
         setIsLoading(true);
+        // Wait for all product details to be fetched
         const loadedProducts = await loadProducts(publicClient, contractAddress);
 
-        // We need to get the full product details to check the buyer
-        // First, get all products
-        const productDetailsPromises = loadedProducts.map(async (product) => {
-          try {
-            // Fetch the product from blockchain to get buyer information
-            const productData = await publicClient.readContract({
-              address: contractAddress as `0x${string}`,
-              abi: (await import("@/contracts/PayUnlock.sol/PayUnlock.json")).default.abi,
-              functionName: 'products',
-              args: [parseInt(product.id)],
-            }) as any;
-
-            // Extract buyer address from product data
-            const [, , , , , buyer] = productData;
-
-            // Return product with buyer information
-            return {
-              ...product,
-              fullBuyer: buyer
-            };
-          } catch (err) {
-            console.error(`Error fetching details for product ${product.id}:`, err);
-            return null;
-          }
+        const myPurchases = loadedProducts.filter(product => {
+          return product.buyer.toLowerCase() === address.toLowerCase();
         });
-
-        // Wait for all product details to be fetched
-        const productsWithDetails = (await Promise.all(productDetailsPromises)).filter(Boolean);
-
-        // Filter products where the buyer address matches the current user's address
-        const myPurchases = productsWithDetails.filter(product => {
-          if (!product?.fullBuyer) return false;
-
-          // Compare addresses in lowercase to ensure case-insensitive matching
-          return product.fullBuyer.toLowerCase() === address.toLowerCase();
-        });
-
         setProducts(myPurchases);
       } catch (err: any) {
         console.error("Error fetching products:", err);

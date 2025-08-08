@@ -1,17 +1,16 @@
-import { useParams, Link } from "react-router-dom";
-import { Layout } from "../components/Layout";
-import { ProductStatusBadge } from "../components/ProductStatusBadge";
-import { useState, useEffect } from "react";
-import { usePublicClient, useWalletClient, useAccount, useSignMessage } from "wagmi";
-import { formatUnits, parseUnits, encodeFunctionData, toHex } from "viem";
+import {Link, useParams} from "react-router-dom";
+import {Layout} from "../components/Layout";
+import {ProductStatusBadge} from "../components/ProductStatusBadge";
+import {useEffect, useState} from "react";
+import {useAccount, usePublicClient, useSignMessage, useWalletClient} from "wagmi";
+import {encodeFunctionData, formatUnits, parseUnits, toHex} from "viem";
 import PayUnlockABI from "@/contracts/PayUnlock.sol/PayUnlock.json";
-import { getCurrentConfig } from "@/config";
-import { useAppKit } from "@reown/appkit/react";
-import { ShoppingCart, ChevronDown, ChevronUp, Key } from "lucide-react";
-import { b64FromBytes } from "@/utils/encoding";
-import { generateKeyPairFromB64, getEncryptionSeed } from "@/utils/keygen";
+import {getCurrentConfig} from "@/config";
+import {useAppKit} from "@reown/appkit/react";
+import {ChevronDown, ChevronUp, Key, ShoppingCart} from "lucide-react";
+import {b64FromBytes} from "@/utils/encoding";
+import {generateKeyPairFromB64, getEncryptionSeed} from "@/utils/keygen";
 import {decryptAES, decryptWithECIES, encryptWithECIES} from "@/utils/encryption";
-
 
 
 // Interface for product JSON data
@@ -51,7 +50,6 @@ export function OfferDetailsPage() {
   const [product, setProduct] = useState<Product | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isPurchasing, setIsPurchasing] = useState(false);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
 
   // Buyer modal state
@@ -77,7 +75,6 @@ export function OfferDetailsPage() {
   const [isSellerProcessing, setIsSellerProcessing] = useState(false);
   const [isSellerConfirming, setIsSellerConfirming] = useState(false);
   const [isSellerConfirmed, setIsSellerConfirmed] = useState(false);
-  const [sellerKeyPair, setSellerKeyPair] = useState<{ privateKey: string, publicKey: string } | null>(null);
   const [sellerError, setSellerError] = useState<string | null>(null);
   const [encryptedSymKeyForBuyer, setEncryptedSymKeyForBuyer] = useState<string | null>(null);
 
@@ -100,8 +97,7 @@ export function OfferDetailsPage() {
         console.warn(`Failed to load JSON for product ${fileId}: ${response.status}`);
         return null;
       }
-      const data = await response.json();
-      return data;
+      return await response.json();
     } catch (error) {
       console.warn(`Error loading JSON for product ${fileId}:`, error);
       return null;
@@ -140,7 +136,6 @@ export function OfferDetailsPage() {
 
     // Reset seller modal state
     setSellerCurrentStep(0);
-    setSellerKeyPair(null);
     setIsSellerProcessing(false);
     setIsSellerConfirming(false);
     setIsSellerConfirmed(false);
@@ -350,9 +345,6 @@ export function OfferDetailsPage() {
 
       // Generate key pair from signature
       const keyPair = await generateKeyPairFromB64(signatureBase64);
-
-      // Store the key pair
-      setSellerKeyPair(keyPair);
 
       // Get the encrypted symmetric key from the product
       if (!product.sellerPubKey) {
@@ -734,7 +726,7 @@ export function OfferDetailsPage() {
                   {product.status === 0 && (
                     <button
                       onClick={handlePurchase}
-                      disabled={isPurchasing || !isConnected}
+                      disabled={!isConnected}
                       className="w-full bg-green-600 text-white px-4 py-2 rounded-md font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 border border-green-500 shadow-sm"
                     >
                       <ShoppingCart className="w-4 h-4" />
@@ -877,11 +869,10 @@ export function OfferDetailsPage() {
                   <>
                     <button
                       onClick={handlePurchase}
-                      disabled={isPurchasing || !isConnected}
+                      disabled={ !isConnected}
                       className="w-full bg-primary text-primary-foreground px-6 py-3 rounded-md text-lg font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-primary/20 shadow-sm"
                     >
-                      {!isConnected ? "Connect Wallet to Purchase" :
-                       isPurchasing ? "Processing Purchase..." : "Purchase Now"}
+                      {!isConnected ? "Connect Wallet to Purchase" : "Purchase Now"}
                     </button>
                     <p className="text-center text-sm text-muted-foreground mt-2">
                       Secure payment with escrow protection

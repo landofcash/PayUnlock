@@ -30,7 +30,6 @@ export function MyOffersPage() {
         const loadedProducts = await loadProducts(publicClient, contractAddress);
 
         // Filter products where the seller address matches the current user's address
-        // Compare full addresses directly (case-insensitive)
         const myOffers = loadedProducts.filter(product => {
           return product.seller.toLowerCase() === address.toLowerCase();
         });

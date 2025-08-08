@@ -6,12 +6,11 @@ import {
   ShoppingBag,
   Package,
   ShoppingCart,
-  Store,
-  Wallet,
-  Lock
+  Store
 } from 'lucide-react';
 import { WalletConnectButton } from './WalletConnectButton';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import PayUnlockLogo from '../assets/PayUnlock-logo.png';
 
 export interface LayoutProps {
   children: ReactNode;
@@ -27,7 +26,11 @@ export function Layout({ children }: LayoutProps) {
             <div className="flex items-center">
               <Link to="/" className="flex items-center gap-2">
                 <div className="bg-primary-foreground rounded-full p-1.5">
-                  <Lock className="h-5 w-5 text-primary" />
+                  <img
+                    src={PayUnlockLogo}
+                    alt="PayUnlock Logo"
+                    className="h-7 w-7 object-contain"
+                  />
                 </div>
                 <span className="text-xl font-bold">PayUnlock</span>
               </Link>
@@ -81,12 +84,6 @@ export function Layout({ children }: LayoutProps) {
                         className="text-sm hover:underline p-2 hover:bg-accent rounded-sm transition-colors"
                       >
                         Contract Debug
-                      </Link>
-                      <Link
-                        to="/debug/test-create"
-                        className="text-sm hover:underline p-2 hover:bg-accent rounded-sm transition-colors"
-                      >
-                        Create Product Debug
                       </Link>
                     </div>
                   </div>

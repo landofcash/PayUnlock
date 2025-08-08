@@ -19,6 +19,7 @@ export interface Product {
   description: string;
   price: string;
   seller: string;
+  buyer: string;
   fileId: string;
   status: number;
 }
@@ -79,7 +80,7 @@ export const loadProducts = async (
   // Process the results and fetch JSON data for each product
   const formattedProductPromises = productResults.map(async (product: any, index) => {
     // Extract product data from blockchain
-    const [seller, price, currency, status, fileId] = product as [string, bigint, string, number, string];
+    const [seller, price, currency, status, fileId, buyer] = product as [string, bigint, string, number, string, string];
 
     // Load product JSON data
     const productJsonData = await loadProductJSON(fileId);
@@ -99,7 +100,8 @@ export const loadProducts = async (
       price: formattedPrice,
       seller: seller,
       fileId,
-      status
+      status,
+      buyer:buyer
     };
   });
 

@@ -16,8 +16,8 @@ export function HomePage() {
           <div className="bg-card p-6 rounded-lg shadow-md">
             <h2 className="text-2xl font-semibold mb-4">For Buyers</h2>
             <p className="mb-4">
-              Shop with confidence using on-chain escrow.
-              Your payment is held in a Hedera smart contract and only released when your digital product is securely delivered.
+              Shop using on-chain escrow.
+              Your payment is held in a Hedera smart contract and only released when your digital product is delivered.
             </p>
             <Link
               to="/offers"

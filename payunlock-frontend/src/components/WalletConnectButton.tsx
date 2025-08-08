@@ -1,7 +1,6 @@
 import { useAppKit, useAppKitAccount } from '@reown/appkit/react';
-import { Button } from './ui/button';
 import { useState } from 'react';
-import { Copy, Check, ExternalLink, Wallet } from 'lucide-react';
+import { Copy, Check, Wallet } from 'lucide-react';
 
 export function WalletConnectButton() {
   const { open } = useAppKit();
@@ -18,13 +17,6 @@ export function WalletConnectButton() {
 
   const formatAddress = (addr: string) => {
     return `${addr.substring(0, 6)}...${addr.substring(addr.length - 4)}`;
-  };
-
-  const openExplorer = () => {
-    if (address) {
-      // Update this URL based on your network (Hedera in your case)
-      window.open(`https://hashscan.io/mainnet/account/${address}`, '_blank');
-    }
   };
 
   if (!isConnected) {
@@ -56,14 +48,6 @@ export function WalletConnectButton() {
         title="Copy address"
       >
         {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-      </button>
-
-      <button
-        className="p-2 rounded-md hover:bg-primary-foreground/10 transition-colors"
-        onClick={openExplorer}
-        title="View on explorer"
-      >
-        <ExternalLink className="h-4 w-4" />
       </button>
     </div>
   );
