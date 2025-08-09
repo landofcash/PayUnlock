@@ -8,6 +8,9 @@ There is no database or server side storage other than Hedera contracts and encr
 
 PayUnlock is redefining digital commerce by removing intermediaries and guaranteeing secure delivery of digital products. Powered by advanced cryptography and Hedera smart contracts, it creates a trustless environment where buyers can verify content before payment is released. This DeFi-driven model brings practical, real-world use cases to hashgraph, with security, transparency, and a seamless user experience at its core.
 
+## Pitch Deck
+https://1drv.ms/b/c/a04b2e7f718aee61/Eaztc9HCPzlGjnacCiPjf74BggERfw1yqR5StzZVNGjE7A?e=Bd8taY
+
 ## Project Structure
 
 - **Frontend** - React SPA is in payunlock-frontend folder
